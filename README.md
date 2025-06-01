@@ -1,127 +1,315 @@
+# Claude Desktop AppImage Builder
 
-# Claude Desktop for Linux (AppImage)
+**Unofficial AppImage build scripts for running Claude Desktop on Linux systems, with optimized support for ARM64/aarch64 architectures including Apple Silicon Macs running Asahi Linux.**
 
-This project was inspired by [aaddrick claude-desktop-debian](https://github.com/aaddrick/claude-desktop-debian) for running Claude Desktop natively on Linux. Their work provided valuable insights into the application's structure and the native bindings implementation.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE-MIT)
+[![Architecture](https://img.shields.io/badge/Architecture-x86__64%20%7C%20aarch64-blue)](#supported-architectures)
+[![Distribution](https://img.shields.io/badge/Distro-Ubuntu%20%7C%20Fedora%20%7C%20Debian-green)](#supported-distributions)
 
-The main changes are:
+> **⚠️ DISCLAIMER**: This is an **UNOFFICIAL** build script. For official support, please contact Anthropic. Report issues with this build process here, not to Anthropic.
 
-- No `sudo` required (if some dependencies are missing, it will guide you to install them)
-- AppImage generation instead of a `.deb` package
+## ✨ Features
 
+- **🚀 No sudo required** for AppImage execution (dependencies may need system installation)
+- **💾 Persistent data storage** - your conversations and settings are saved
+- **🎯 Multi-architecture support** - optimized for both x86_64 and ARM64/aarch64
+- **🖥️ Full desktop integration** - system tray, keyboard shortcuts (Ctrl+Alt+Space), notifications
+- **🔌 MCP Protocol support** - Model Context Protocol for enhanced functionality
+- **📱 Native Linux experience** - proper window management and desktop environment integration
 
-> NOTE:  A big part of this README is taken by [aaddrick claude-desktop-debian](https://github.com/aaddrick/claude-desktop-debian) README
+## 🖼️ Screenshots
 
-***THIS IS AN UNOFFICIAL BUILD SCRIPT!***
+### Main Interface with MCP Support
+![Claude Desktop Interface](https://github.com/user-attachments/assets/93080028-6f71-48bd-8e59-5149d148cd45)
 
-If you run into an issue with this build script, make an issue here. Don't bug Anthropic about it - they already have enough on their plates.
+### Quick Access Popup (Ctrl+Alt+Space)
+![Quick Access Popup](https://github.com/user-attachments/assets/1deb4604-4c06-4e4b-b63f-7f6ef9ef28c1)
 
+### System Tray Integration (KDE)
+![System Tray](https://github.com/user-attachments/assets/ba209824-8afb-437c-a944-b53fd9ecd559)
 
-# Supports MCP!
+## 🚀 Quick Start
 
-Location of the MCP-configuration file is: `~/.config/Claude/claude_desktop_config.json`
-
-![image](https://github.com/user-attachments/assets/93080028-6f71-48bd-8e59-5149d148cd45)
-
-Supports the Ctrl+Alt+Space popup!
-![image](https://github.com/user-attachments/assets/1deb4604-4c06-4e4b-b63f-7f6ef9ef28c1)
-
-Supports the Tray menu! (Screenshot of running on KDE)
-![image](https://github.com/user-attachments/assets/ba209824-8afb-437c-a944-b53fd9ecd559)
-
-# How to use it
-
-## 1. Download the repo
+### One-Command Build
 
 ```bash
-# Clone this repository
-git clone https://github.com/fsoft72/claude-desktop-to-appimage.git
+# Clone the repository
+git clone https://github.com/yourusername/claude-desktop-to-appimage.git
 cd claude-desktop-to-appimage
 
-# Build the AppImage
+# Build the AppImage (auto-detects your system)
 ./build-appimage.sh
 
-# The script will automatically:
-# - Check for required dependencies (installation must be done by the user)
-# - Download and extract resources from the Windows version
-# - Create a proper AppImage
+# Run Claude Desktop
+./Claude_Desktop-0.9.3-aarch64.AppImage
 ```
 
-Requirements:
-- Any Debian-based Linux distribution
-- Node.js >= 12.0.0 and npm
-
-## Command line
-
-The script accepts the following command line arguments:
+### Add Data Persistence
 
 ```bash
-Usage: ./build-appimage.sh [--appimagetool <path>] [--bundle-electron] [-h|--help]
-  --appimagetool <path>   Path to appimagetool (default: /home/fabio/data/opt/appimagetool-x86_64.AppImage)
-  --bundle-electron       Bundle Electron with the AppImage (default: 0)
-  --claude-download-url <url>  URL to download the Windows installer (default: https://claude.ai/download)
-  -h, --help             Show this help message
+# Make your data persistent across runs
+./add_persistence_simple.sh
 
-./build-appimage.sh [--appimagetool <path>] [--bundle-electron] [-h|--help]
+# Run the persistent version
+./Claude_Desktop-0.9.3-aarch64-persistent.AppImage
 ```
 
-You can run the script without arguments, and it will use the default values.
+## 📋 System Requirements
+
+### Supported Architectures
+- **x86_64** (Intel/AMD 64-bit)
+- **aarch64/ARM64** (Apple Silicon, Raspberry Pi 4+, other ARM64 devices)
+
+### Supported Distributions
+- **Ubuntu** 20.04+ and derivatives
+- **Fedora** 35+ (optimized scripts for Fedora Asahi)
+- **Debian** 11+ and derivatives
+- **Arch Linux** and derivatives
+- Most other Linux distributions with required dependencies
+### Dependencies
+- **Node.js** ≥ 12.0.0 and npm
+- **7zip** (`p7zip` package)
+- **wget** 
+- **icoutils** (wrestool, icotool)
+- **ImageMagick** (convert command)
+- **FUSE** support (usually pre-installed)
+
+*The build script will check for missing dependencies and guide you through installation.*
+
+## 🔧 Advanced Usage
+
+### Command Line Options
 
 ```bash
+# Basic usage
 ./build-appimage.sh
+
+# Custom Claude download URL
+./build-appimage.sh --claude-download-url "https://custom-url/claude.exe"
+
+# Use custom appimagetool path
+./build-appimage.sh --appimagetool /path/to/appimagetool
+
+# Bundle Electron with AppImage
+./build-appimage.sh --bundle-electron
+
+# Show help
+./build-appimage.sh --help
 ```
 
-# How it works
+### Platform-Specific Builders
 
-Claude Desktop is an Electron application packaged as a Windows executable. Our build script performs several key operations to make it work on Linux:
+For ARM64 systems (especially Fedora Asahi):
+```bash
+./fedora_asahi_build_script.sh
+```
 
-1. Downloads and extracts the Windows installer
-2. Unpacks the app.asar archive containing the application code
-3. Replaces the Windows-specific native module with a Linux-compatible implementation
-4. Repackages everything into a proper Debian package
+For manual building when automated tools fail:
+```bash
+./manual_appimage_builder.sh
+```
 
-The process works because Claude Desktop is largely cross-platform, with only one platform-specific component that needs replacement.
+### Installation Options
 
-## The Native Module Challenge
+#### Option 1: Portable Usage
+```bash
+# Just run directly - no installation needed
+./Claude_Desktop-0.9.3-aarch64-persistent.AppImage
+```
 
-The only platform-specific component is a native Node.js module called `claude-native-bindings`. This module provides system-level functionality like:
+#### Option 2: User Installation
+```bash
+# Install to user bin directory
+mkdir -p ~/.local/bin
+cp Claude_Desktop-0.9.3-aarch64-persistent.AppImage ~/.local/bin/claude-desktop
+chmod +x ~/.local/bin/claude-desktop
 
-- Keyboard input handling
-- Window management
-- System tray integration
-- Monitor information
+# Add to PATH if needed
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
 
-Our build script replaces this Windows-specific module with a Linux-compatible implementation that:
+# Now run from anywhere
+claude-desktop
+```
 
-1. Provides the same API surface to maintain compatibility
-2. Implements keyboard handling using the correct key codes from the reference implementation
-3. Stubs out unnecessary Windows-specific functionality
-4. Maintains critical features like the Ctrl+Alt+Space popup and system tray
+## 📁 Data Storage Locations
 
-The replacement module is carefully designed to match the original API while providing Linux-native functionality where needed. This approach allows the rest of the application to run unmodified, believing it's still running on Windows.
+Your Claude data persists in standard XDG directories:
 
-## Build Process Details
+- **Configuration & Login**: `~/.config/Claude/`
+- **Conversations & Files**: `~/.local/share/Claude/`
+- **Cache & Temporary Files**: `~/.cache/Claude/`
+- **MCP Configuration**: `~/.config/Claude/claude_desktop_config.json`
 
-The build script (`build-appimage.sh`) handles the entire process:
+## 🔧 Technical Details
 
-1. Checks for a Debian-based system and required dependencies
-2. Downloads the official Windows installer
-3. Extracts the application resources
-4. Processes icons for Linux desktop integration
-5. Unpacks and modifies the app.asar:
-   - Replaces the native module with our Linux version
-   - Updates keyboard key mappings
-   - Preserves all other functionality
-6. Creates a proper AppImage with:
-   - Desktop entry for application menus
-   - System-wide icon integration
-   - Proper dependency management
-   - Post-install configuration
+### How It Works
 
-# License
+Claude Desktop is an Electron application packaged as a Windows executable. This project:
 
-The build script in this repository is licensed under MIT License.
+1. **Downloads** the official Windows installer from Anthropic
+2. **Extracts** the app.asar archive containing the application code
+3. **Replaces** Windows-specific native modules with Linux-compatible implementations
+4. **Repackages** everything into a proper Linux AppImage
+5. **Adds** desktop integration and persistent data storage
 
-See [LICENSE-MIT](LICENSE-MIT) for details.
+### Architecture Support
 
-The Claude Desktop application, not included in this repository, is likely covered by [Anthropic's Consumer Terms](https://www.anthropic.com/legal/consumer-terms).
-# claude-desktop-to-appimage
+The main challenge for ARM64 builds is the `claude-native-bindings` module, which provides:
+- Keyboard input handling with correct key mappings
+- Window management and system tray integration
+- Monitor information and system-level functionality
+
+Our build scripts replace this with a Linux-compatible implementation that maintains the same API while providing native Linux functionality.
+
+### Native Module Implementation
+
+```javascript
+// Stub implementation for claude-native-bindings
+const KeyboardKey = {
+  Backspace: 43, Tab: 280, Enter: 261, Shift: 272, Control: 61, Alt: 40,
+  CapsLock: 56, Escape: 85, Space: 276, PageUp: 251, PageDown: 250,
+  End: 83, Home: 154, LeftArrow: 175, UpArrow: 282, RightArrow: 262,
+  DownArrow: 81, Delete: 79, Meta: 187
+};
+
+module.exports = {
+  getWindowsVersion: () => "10.0.0",
+  setWindowEffect: () => {}, removeWindowEffect: () => {},
+  flashFrame: () => {}, showNotification: () => {},
+  KeyboardKey
+};
+```
+
+## 🛠️ Troubleshooting
+
+### Common Issues
+
+#### AppImage Won't Start
+```bash
+# Make executable
+chmod +x Claude_Desktop-0.9.3-aarch64-persistent.AppImage
+
+# Check dependencies
+ldd Claude_Desktop-0.9.3-aarch64-persistent.AppImage
+
+# Try verbose mode
+./Claude_Desktop-0.9.3-aarch64-persistent.AppImage --verbose
+```
+
+#### FUSE Issues (Common on Fedora)
+```bash
+# Check FUSE device
+ls -la /dev/fuse
+
+# Fix permissions
+sudo chmod 666 /dev/fuse
+sudo modprobe fuse
+
+# Create persistent fix
+echo 'KERNEL=="fuse", MODE="0666"' | sudo tee /etc/udev/rules.d/99-fuse.rules
+```
+
+#### Data Not Persisting
+```bash
+# Check directories exist
+ls -la ~/.config/Claude/ ~/.local/share/Claude/
+
+# Create manually if needed
+mkdir -p ~/.config/Claude ~/.local/share/Claude ~/.cache/Claude
+
+# Use persistent version
+./add_persistence_simple.sh
+```
+
+#### ARM64 Build Failures
+```bash
+# Use specialized builder
+./fedora_asahi_build_script.sh
+
+# If that fails, try manual approach
+./manual_appimage_builder.sh
+```
+
+### Getting Help
+
+Check the detailed troubleshooting guides:
+- [Complete Usage Guide](complete_usage_guide.md) - Comprehensive setup and usage instructions
+- [Technical Documentation](claude_appimage_documentation.md) - In-depth technical details
+- [Project Structure](PROJECT_STRUCTURE.md) - Understanding the codebase
+
+## 📦 Build Artifacts
+
+After a successful build, you'll have:
+
+```
+Claude_Desktop-0.9.3-aarch64.AppImage          # Standard version
+Claude_Desktop-0.9.3-aarch64-persistent.AppImage  # With data persistence (recommended)
+```
+
+## 🤝 Contributing
+
+We welcome contributions! Areas for improvement:
+
+- **Platform support** - test on more distributions
+- **Architecture support** - RISC-V, other architectures  
+- **Build process** - more robust error handling
+- **Documentation** - better guides and examples
+
+### Development Setup
+
+```bash
+git clone https://github.com/yourusername/claude-desktop-to-appimage.git
+cd claude-desktop-to-appimage
+
+# Make scripts executable
+chmod +x *.sh
+
+# Test build process
+./build-appimage.sh --help
+```
+
+## 📊 Project Status
+
+This project successfully creates working Claude Desktop AppImages for:
+
+- ✅ **Ubuntu 20.04+** (x86_64, aarch64)
+- ✅ **Fedora 35+** (x86_64, aarch64) 
+- ✅ **Fedora Asahi Remix** (Apple Silicon)
+- ✅ **Debian 11+** (x86_64, aarch64)
+- 🔄 **Arch Linux** (testing in progress)
+
+Features confirmed working:
+- ✅ Main application functionality
+- ✅ Data persistence across sessions
+- ✅ System tray integration
+- ✅ Keyboard shortcuts (Ctrl+Alt+Space)
+- ✅ MCP protocol support
+- ✅ Desktop integration
+- ✅ Notifications
+
+## 📄 License & Legal
+
+**Build Scripts**: MIT License - see [LICENSE-MIT](LICENSE-MIT)
+
+**Claude Desktop Application**: Subject to [Anthropic's Consumer Terms](https://www.anthropic.com/legal/consumer-terms). This project only provides build scripts; the actual Claude Desktop application is downloaded from Anthropic's official servers.
+
+## 🙏 Acknowledgments
+
+- **Anthropic** for creating Claude Desktop
+- **[@aaddrick](https://github.com/aaddrick/claude-desktop-debian)** for the original Debian packaging inspiration
+- **AppImage Project** for the AppImage format and tools
+- **Asahi Linux** for making Linux possible on Apple Silicon
+- **Fedora Project** for Fedora Asahi Remix
+
+## 🔗 Related Projects
+
+- [aaddrick/claude-desktop-debian](https://github.com/aaddrick/claude-desktop-debian) - Original Debian packaging
+- [AppImage/AppImageKit](https://github.com/AppImage/AppImageKit) - AppImage creation tools
+- [AsahiLinux/asahi-installer](https://github.com/AsahiLinux/asahi-installer) - Asahi Linux installer
+
+---
+
+**Questions?** Check our [documentation](claude_appimage_documentation.md) or [open an issue](https://github.com/yourusername/claude-desktop-to-appimage/issues).
+
+**Found this helpful?** Give it a ⭐ and help others discover it!
