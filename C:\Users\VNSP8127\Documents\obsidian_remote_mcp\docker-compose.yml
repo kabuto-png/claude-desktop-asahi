@@ -1,0 +1,136 @@
+# Obsidian Remote MCP - Docker Environment
+version: '3.8'
+
+services:
+  # MCP Server - Core backend
+  mcp-server:
+    build: 
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: obsidian-mcp-server
+    ports:
+      - "3010:3000"  # External:Internal (avoiding conflict with port 3000)
+    volumes:
+      - /home/longne/Documents/GitHub/Longneobsidian:/app/vault:rw
+      - ./server/src:/app/src:rw
+      - mcp_node_modules:/app/node_modules
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - VAULT_PATH=/app/vault
+      - CHROMA_URL=http://vectordb:8000
+      - POSTGRES_URL=postgresql://postgres:password@postgres:5432/obsidian_mcp
+    depends_on:
+      - postgres
+      - vectordb
+    networks:
+      - obsidian-network
+    restart: unless-stopped
+
+  # React Dashboard - Frontend
+  dashboard:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: obsidian-dashboard
+    ports:
+      - "3011:3001"  # External:Internal
+    volumes:
+      - ./client/src:/app/src:rw
+      - ./client/public:/app/public:rw
+      - client_node_modules:/app/node_modules
+    environment:
+      - NODE_ENV=development
+      - REACT_APP_API_URL=http://localhost:3010
+      - REACT_APP_WS_URL=ws://localhost:3010
+    depends_on:
+      - mcp-server
+    networks:
+      - obsidian-network
+    restart: unless-stopped
+
+  # Vector Database - ChromaDB for semantic search
+  vectordb:
+    image: chromadb/chroma:0.4.22
+    container_name: obsidian-vectordb
+    ports:
+      - "8010:8000"  # External:Internal (avoiding conflict with port 8000)
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      - CHROMA_SERVER_HOST=0.0.0.0
+      - CHROMA_SERVER_HTTP_PORT=8000
+    networks:
+      - obsidian-network
+    restart: unless-stopped
+
+  # PostgreSQL - Metadata and analytics storage
+  postgres:
+    image: postgres:15-alpine
+    container_name: obsidian-postgres
+    ports:
+      - "5442:5432"  # External:Internal (avoiding conflict with standard 5432)
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./server/database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    environment:
+      - POSTGRES_DB=obsidian_mcp
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+    networks:
+      - obsidian-network
+    restart: unless-stopped
+
+  # Redis - Caching and session storage
+  redis:
+    image: redis:7-alpine
+    container_name: obsidian-redis
+    ports:
+      - "6389:6379"  # External:Internal (avoiding potential conflicts)
+    volumes:
+      - redis_data:/data
+    networks:
+      - obsidian-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  # Nginx - Reverse proxy and static files
+  nginx:
+    image: nginx:alpine
+    container_name: obsidian-nginx
+    ports:
+      - "8080:80"     # Main access point - http://localhost:8080
+      - "8443:443"    # HTTPS (future)
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - client_build:/usr/share/nginx/html
+    depends_on:
+      - mcp-server
+      - dashboard
+    networks:
+      - obsidian-network
+    restart: unless-stopped
+
+# Volumes for data persistence
+volumes:
+  postgres_data:
+    driver: local
+  chroma_data:
+    driver: local
+  redis_data:
+    driver: local
+  mcp_node_modules:
+    driver: local
+  client_node_modules:
+    driver: local
+  client_build:
+    driver: local
+
+# Network for inter-service communication
+networks:
+  obsidian-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

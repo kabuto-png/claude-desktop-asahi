@@ -1,0 +1,38 @@
+#!/bin/bash
+HERE="$(dirname "$(readlink -f "$0")")"
+
+# Set up data persistence directories
+export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
+export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
+
+# Create Claude directories
+mkdir -p "$XDG_CONFIG_HOME/Claude"
+mkdir -p "$XDG_DATA_HOME/Claude"
+mkdir -p "$XDG_CACHE_HOME/Claude"
+
+# Set proper permissions
+chmod 755 "$XDG_CONFIG_HOME/Claude" 2>/dev/null || true
+chmod 755 "$XDG_DATA_HOME/Claude" 2>/dev/null || true
+chmod 755 "$XDG_CACHE_HOME/Claude" 2>/dev/null || true
+
+# For Fedora Asahi ARM64
+export PATH="$HERE/usr/bin:$HERE/usr/lib/claude-desktop/node_modules/electron/dist:$PATH"
+export LD_LIBRARY_PATH="$HERE/usr/lib:$LD_LIBRARY_PATH"
+
+# Find Electron
+if [ -f "$HERE/usr/lib/claude-desktop/node_modules/electron/dist/electron" ]; then
+    ELECTRON="$HERE/usr/lib/claude-desktop/node_modules/electron/dist/electron"
+elif command -v electron &>/dev/null; then
+    ELECTRON="electron"
+else
+    echo "Error: Electron not found"
+    exit 1
+fi
+
+# Launch with data persistence
+exec "$ELECTRON" \
+    --no-sandbox \
+    --user-data-dir="$XDG_CONFIG_HOME/Claude" \
+    "$HERE/usr/lib/claude-desktop/app.asar" \
+    "$@"
