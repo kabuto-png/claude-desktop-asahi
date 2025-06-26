@@ -20,7 +20,7 @@ echo "Distribution: $(grep PRETTY_NAME /etc/os-release | cut -d'"' -f2)"
 
 # Configuration
 ELECTRON_BUNDLED=1  # Always bundle on Asahi for compatibility
-CLAUDE_DOWNLOAD_URL="https://storage.googleapis.com/osprey-downloads-c02f6a0d-347c-492b-a752-3e0651722e97/nest-win-x64/Claude-Setup-x64.exe"
+CLAUDE_DOWNLOAD_URL="https://storage.googleapis.com/osprey-downloads-c02f6a0d-347c-492b-a752-3e0651722e97/nest-win-arm64/Claude-Setup-arm64.exe"
 APP_IMAGE_TOOL="/usr/local/bin/appimagetool"
 
 # Parse command line arguments
@@ -177,6 +177,7 @@ if ! command -v asar &>/dev/null; then
     echo "Installing asar..."
     npm install -g asar
 fi
+export PATH="/home/longne/.npm-global/bin:$PATH"
 
 CURRENT_DIR="$(pwd)"
 WORK_DIR="$CURRENT_DIR/build"

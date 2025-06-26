@@ -2,7 +2,7 @@
 # Fixed Claude Desktop Launcher for Fedora Asahi - Version 2
 # Addresses multiple mount issues and ARM64 graphics problems
 
-set -e
+
 
 # Configuration
 APPIMAGE_PATH="/home/longne/Documents/GitHub/claude-desktop-to-appimage/Claude_Desktop-0.9.3-aarch64-persistent.AppImage"
@@ -29,15 +29,15 @@ log_error() {
 # Function to clean up existing Claude processes and mounts
 cleanup_claude() {
     log_info "Cleaning up existing Claude processes and mounts..."
-    
+
     # Kill existing Claude processes
     pkill -f claude-desktop 2>/dev/null || true
     pkill -f "Claude_Desktop.*AppImage" 2>/dev/null || true
     pkill -f "/tmp/.mount_claude" 2>/dev/null || true
-    
+
     # Wait for processes to exit
     sleep 2
-    
+
     # Clean up old AppImage mounts
     for mount in $(mount | grep -o '/tmp/\.mount_claude[^[:space:]]*' | sort -u); do
         if [ -d "$mount" ]; then
@@ -46,7 +46,7 @@ cleanup_claude() {
             sleep 1
         fi
     done
-    
+
     # Remove old temporary files
     rm -rf /tmp/.mount_claude* 2>/dev/null || true
     rm -f "$LOCK_FILE" 2>/dev/null || true
@@ -55,83 +55,127 @@ cleanup_claude() {
 # Function to set up environment for Fedora Asahi ARM64
 setup_environment() {
     log_info "Setting up environment for Fedora Asahi ARM64..."
-    
+
     # Graphics and display fixes for ARM64/Asahi
     export ELECTRON_OZONE_PLATFORM_HINT=auto
     export ELECTRON_DISABLE_SECURITY_WARNINGS=true
     export LIBGL_ALWAYS_SOFTWARE=1
     export MESA_GL_VERSION_OVERRIDE=3.3
     export DISPLAY="${DISPLAY:-:0}"
-    
+
     # Memory optimization (FIXED: removed invalid --max-listeners option)
     export NODE_OPTIONS="--max-old-space-size=4096"
-    
+
     # Single instance enforcement
     export ELECTRON_IS_DEV=false
     export ELECTRON_ENABLE_LOGGING=false
-    
+
     # Data persistence directories
     export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
     export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
     export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
-    
+
     # Create data directories
     mkdir -p "$XDG_CONFIG_HOME/Claude"
     mkdir -p "$XDG_DATA_HOME/Claude"
     mkdir -p "$XDG_CACHE_HOME/Claude"
 }
 
+# Function to check for and update AppImage
+check_and_update_appimage() {
+    log_info "Checking for latest Claude Desktop AppImage..."
+
+    local GITHUB_API_URL="https://api.github.com/repos/aaddrick/claude-desktop-debian/releases/latest"
+    local CURRENT_APPIMAGE_VERSION=""
+
+    if [ -f "$APPIMAGE_PATH" ]; then
+        # Extract version from the existing AppImage filename
+        # Expected format: Claude_Desktop-X.Y.Z-aarch64-persistent.AppImage
+        CURRENT_APPIMAGE_VERSION=$(basename "$APPIMAGE_PATH" | sed -n 's/Claude_Desktop-\([0-9]\+\.[0-9]\+\.[0-9]\+\)-aarch64-persistent\.AppImage/\1/p')
+        log_info "Current AppImage version: $CURRENT_APPIMAGE_VERSION"
+    else
+        log_warn "No existing AppImage found at $APPIMAGE_PATH. Will attempt to download the latest."
+    fi
+
+    # Check for curl and jq
+    if ! command -v curl &> /dev/null; then
+        log_error "curl is not installed. Please install it to enable automatic updates (e.g., sudo dnf install curl)."
+        return 1
+    fi
+    if ! command -v jq &> /dev/null; then
+        log_error "jq is not installed. Please install it to enable automatic updates (e.g., sudo dnf install jq)."
+        return 1
+    fi
+
+    local LATEST_RELEASE_INFO=$(curl -s "$GITHUB_API_URL")
+    local LATEST_VERSION=$(echo "$LATEST_RELEASE_INFO" | jq -r '.tag_name' | sed 's/v//') # Remove 'v' prefix
+    local DOWNLOAD_URL=$(echo "$LATEST_RELEASE_INFO" | jq -r '.assets[] | select(.name | contains("arm64.AppImage")) | .browser_download_url')
+
+    if [ -z "$LATEST_VERSION" ] || [ -z "$DOWNLOAD_URL" ]; then
+        log_error "Could not retrieve latest release information or download URL from GitHub."
+        return 1
+    fi
+
+    log_info "Latest available version: $LATEST_VERSION"
+
+    version_gt() {
+    test "$(printf '%s\n' "$1" "$2" | sort -V | head -n 1)" = "$2"
+}
+
+    if [ -z "$CURRENT_APPIMAGE_VERSION" ] || version_gt "$LATEST_VERSION" "$CURRENT_APPIMAGE_VERSION"; then
+        log_info "Newer version available or no existing AppImage. Downloading $LATEST_VERSION..."
+        local TEMP_APPIMAGE="/tmp/Claude_Desktop-${LATEST_VERSION}-aarch64.AppImage"
+        if curl -L -o "$TEMP_APPIMAGE" "$DOWNLOAD_URL"; then
+            log_info "Download complete. Replacing old AppImage..."
+            mv "$TEMP_APPIMAGE" "$APPIMAGE_PATH"
+            chmod +x "$APPIMAGE_PATH"
+            log_info "AppImage updated to version $LATEST_VERSION."
+        else
+            log_error "Failed to download the new AppImage."
+            return 1
+        fi
+    else
+        log_info "You are already on the latest version ($CURRENT_APPIMAGE_VERSION)."
+    fi
+    return 0
+}
+
 # Function to launch Claude Desktop
 launch_claude() {
     log_info "Launching Claude Desktop..."
-    
+
     # Launch with proper flags for Asahi Linux ARM64
-    "$APPIMAGE_PATH" \
-        --no-sandbox \
-        --disable-gpu-sandbox \
-        --disable-software-rasterizer \
-        --disable-dev-shm-usage \
-        --disable-extensions \
-        --disable-plugins \
-        --single-instance \
-        --user-data-dir="$XDG_CONFIG_HOME/Claude" \
-        "$@" 2>&1 | while IFS= read -r line; do
-            # Filter out the EventEmitter warning we know about
-            if [[ ! "$line" =~ "MaxListenersExceededWarning" ]]; then
-                echo "$line"
-            fi
-        done
+    nohup "$APPIMAGE_PATH"         --no-sandbox         --disable-gpu-sandbox         --disable-software-rasterizer         --disable-dev-shm-usage         --disable-extensions         --disable-plugins         --single-instance         --user-data-dir="$XDG_CONFIG_HOME/Claude"         "$@" > "$HOME/.cache/claude-desktop-launch.log" 2>&1 &
+disown
 }
 
 # Main execution
 main() {
-    log_info "=== Claude Desktop Fixed Launcher v2 ==="
-    log_info "For Fedora Asahi ARM64 systems"
-    echo
-    
-    # Check if AppImage exists
+    log_info "=== Claude Desktop Fixed Launcher v2 ===\n"
+    log_info "For Fedora Asahi ARM64 systems\n"
+
+    # Check and update AppImage before proceeding
+    check_and_update_appimage
+
+    # Check if AppImage exists after potential update
     if [ ! -f "$APPIMAGE_PATH" ]; then
-        log_error "AppImage not found: $APPIMAGE_PATH"
-        log_info "Available AppImages in directory:"
-        ls -la /home/longne/Documents/GitHub/claude-desktop-to-appimage/Claude_Desktop-*.AppImage 2>/dev/null || log_error "No AppImages found"
+        log_error "AppImage not found: $APPIMAGE_PATH. Automatic update failed or no AppImage available."
+        log_info "Please ensure the AppImage is present or check your internet connection and GitHub access."
         exit 1
     fi
-    
-    # Make AppImage executable
+
+    # Make AppImage executable (redundant if updated, but safe)
     chmod +x "$APPIMAGE_PATH"
-    
+
     # Clean up any previous instances
     cleanup_claude
-    
+
     # Set up environment
     setup_environment
-    
+
     # Launch Claude
     launch_claude "$@"
 }
-
-# Handle signals for cleanup
-trap cleanup_claude EXIT INT TERM
 
 # Run main function
 main "$@"
