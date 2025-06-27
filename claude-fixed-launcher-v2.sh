@@ -7,6 +7,18 @@
 # Configuration
 APPIMAGE_PATH="/home/longne/Documents/GitHub/claude-desktop-to-appimage/Claude_Desktop-0.9.3-aarch64-persistent.AppImage"
 LOCK_FILE="/tmp/claude-desktop.lock"
+PID_FILE="$HOME/.cache/claude-desktop.pid"
+
+# Trap signals to cleanup on exit
+trap 'cleanup_on_exit' EXIT INT TERM
+
+# Cleanup function for script exit
+cleanup_on_exit() {
+    log_info "Script interrupted - cleaning up..."
+    # Don't kill Claude Desktop when launcher script exits normally
+    # Only cleanup temp files
+    rm -f "$LOCK_FILE" 2>/dev/null || true
+}
 
 # Colors for output
 RED='\033[0;31m'
@@ -30,16 +42,37 @@ log_error() {
 cleanup_claude() {
     log_info "Cleaning up existing Claude processes and mounts..."
 
-    # Kill existing Claude processes
-    pkill -f claude-desktop 2>/dev/null || true
+    # Kill all Claude Desktop processes more aggressively
+    # 1. Kill by AppImage name pattern
     pkill -f "Claude_Desktop.*AppImage" 2>/dev/null || true
-    pkill -f "/tmp/.mount_claude" 2>/dev/null || true
+    
+    # 2. Kill by electron process with Claude data directory
+    pkill -f "user-data-dir.*Claude" 2>/dev/null || true
+    
+    # 3. Kill by mount point pattern
+    pkill -f "/tmp/.mount_[Cc]laude" 2>/dev/null || true
+    
+    # 4. Kill by specific electron processes
+    for pid in $(pgrep -f "electron.*Claude"); do
+        if [ -n "$pid" ]; then
+            log_info "Killing Claude process: $pid"
+            kill -TERM "$pid" 2>/dev/null || kill -KILL "$pid" 2>/dev/null || true
+        fi
+    done
 
-    # Wait for processes to exit
-    sleep 2
+    # Wait for processes to exit gracefully
+    sleep 3
+
+    # Force kill any remaining processes
+    for pid in $(pgrep -f "Claude_Desktop\|/tmp/\.mount_[Cc]laude"); do
+        if [ -n "$pid" ]; then
+            log_warn "Force killing stubborn process: $pid"
+            kill -KILL "$pid" 2>/dev/null || true
+        fi
+    done
 
     # Clean up old AppImage mounts
-    for mount in $(mount | grep -o '/tmp/\.mount_claude[^[:space:]]*' | sort -u); do
+    for mount in $(mount | grep -o '/tmp/\.mount_[Cc]laude[^[:space:]]*' | sort -u); do
         if [ -d "$mount" ]; then
             log_info "Cleaning up mount: $mount"
             fusermount -u "$mount" 2>/dev/null || umount "$mount" 2>/dev/null || true
@@ -48,8 +81,13 @@ cleanup_claude() {
     done
 
     # Remove old temporary files
-    rm -rf /tmp/.mount_claude* 2>/dev/null || true
+    rm -rf /tmp/.mount_[Cc]laude* 2>/dev/null || true
     rm -f "$LOCK_FILE" 2>/dev/null || true
+    
+    # Remove PID file if exists
+    rm -f "$HOME/.cache/claude-desktop.pid" 2>/dev/null || true
+    
+    log_info "Cleanup completed."
 }
 
 # Function to set up environment for Fedora Asahi ARM64
@@ -144,9 +182,38 @@ check_and_update_appimage() {
 launch_claude() {
     log_info "Launching Claude Desktop..."
 
+    # Check if already running by PID file
+    PID_FILE="$HOME/.cache/claude-desktop.pid"
+    if [ -f "$PID_FILE" ]; then
+        OLD_PID=$(cat "$PID_FILE")
+        if kill -0 "$OLD_PID" 2>/dev/null; then
+            log_warn "Claude Desktop already running with PID: $OLD_PID"
+            log_info "Killing existing instance..."
+            kill -TERM "$OLD_PID" 2>/dev/null || kill -KILL "$OLD_PID" 2>/dev/null || true
+            sleep 2
+        fi
+        rm -f "$PID_FILE"
+    fi
+
     # Launch with proper flags for Asahi Linux ARM64
-    nohup "$APPIMAGE_PATH"         --no-sandbox         --disable-gpu-sandbox         --disable-software-rasterizer         --disable-dev-shm-usage         --disable-extensions         --disable-plugins         --single-instance         --user-data-dir="$XDG_CONFIG_HOME/Claude"         "$@" > "$HOME/.cache/claude-desktop-launch.log" 2>&1 &
-disown
+    "$APPIMAGE_PATH" \
+        --no-sandbox \
+        --disable-gpu-sandbox \
+        --disable-software-rasterizer \
+        --disable-dev-shm-usage \
+        --disable-extensions \
+        --disable-plugins \
+        --single-instance \
+        --user-data-dir="$XDG_CONFIG_HOME/Claude" \
+        "$@" > "$HOME/.cache/claude-desktop-launch.log" 2>&1 &
+    
+    # Save PID for later cleanup
+    CLAUDE_PID=$!
+    echo "$CLAUDE_PID" > "$PID_FILE"
+    log_info "Claude Desktop launched with PID: $CLAUDE_PID"
+    log_info "Log file: $HOME/.cache/claude-desktop-launch.log"
+    
+    disown
 }
 
 # Main execution
