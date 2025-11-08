@@ -82,9 +82,12 @@ The build scripts **automatically detect** the Claude Desktop version from the i
 
 ### Version Auto-Detection
 
-- The version is extracted from the downloaded installer filename
-- No hardcoded versions - always builds with the correct version number
+- **Primary source**: Version is extracted from `app.asar/package.json` (most reliable)
+- **Fallback**: Uses `.nupkg` filename if primary extraction fails
+- **No hardcoded versions**: Always builds with the actual app version
 - AppImage files are named: `Claude_Desktop-<version>-<arch>.AppImage`
+
+**Technical details**: See [VERSION_DETECTION.md](VERSION_DETECTION.md) for how version detection works.
 
 ### Getting the Latest Version
 
