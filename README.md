@@ -103,9 +103,14 @@ The default download URL in the script may be updated periodically. To ensure yo
 # Check the filename
 ls Claude_Desktop-*.AppImage
 
-# Or use the version checker script
+# Check if you have the latest version
+./check_latest_version.sh
+
+# Or inspect the AppImage contents
 ./check_appimage_version.sh Claude_Desktop-*.AppImage
 ```
+
+**Note**: The download URL is hardcoded in the build script. When new versions are released, you may need to update the URL manually or check community sources for the latest download links.
 
 ## 🔧 Advanced Usage
 
