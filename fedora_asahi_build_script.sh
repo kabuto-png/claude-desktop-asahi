@@ -210,10 +210,29 @@ if [ -z "$NUPKG_PATH" ]; then
     exit 1
 fi
 
-VERSION=$(echo "$NUPKG_PATH" | grep -oP 'AnthropicClaude-\K[0-9]+\.[0-9]+\.[0-9]+(?=-full)')
-echo "✓ Detected version: $VERSION"
-
+# Extract nupkg first
 7z x -y "$NUPKG_PATH"
+
+# Get actual version from app.asar package.json (most reliable)
+echo "Detecting version from app.asar..."
+VERSION=""
+if [ -f "lib/net45/resources/app.asar" ]; then
+    TEMP_EXTRACT=$(mktemp -d)
+    if asar extract lib/net45/resources/app.asar "$TEMP_EXTRACT" 2>/dev/null; then
+        if [ -f "$TEMP_EXTRACT/package.json" ]; then
+            VERSION=$(grep -oP '"version"\s*:\s*"\K[^"]+' "$TEMP_EXTRACT/package.json" 2>/dev/null || echo "")
+        fi
+        rm -rf "$TEMP_EXTRACT"
+    fi
+fi
+
+# Fallback to nupkg filename if app.asar extraction failed
+if [ -z "$VERSION" ]; then
+    echo "⚠️  Could not extract version from app.asar, using nupkg filename..."
+    VERSION=$(basename "$NUPKG_PATH" | grep -oP 'AnthropicClaude-\K[0-9]+\.[0-9]+\.[0-9]+(?=-full)')
+fi
+
+echo "✓ Detected version: $VERSION"
 
 # Extract icons
 echo "=== Processing Icons ==="
