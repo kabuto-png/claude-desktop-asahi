@@ -5,9 +5,34 @@
 
 
 # Configuration
-APPIMAGE_PATH="/home/longne/Documents/GitHub/claude-desktop-to-appimage/Claude_Desktop-0.9.3-aarch64-persistent.AppImage"
+APPIMAGE_DIR="/home/longne/Documents/claude-desktop-to-appimage"
 LOCK_FILE="/tmp/claude-desktop.lock"
 PID_FILE="$HOME/.cache/claude-desktop.pid"
+
+# Function to find the latest AppImage in the directory
+find_latest_appimage() {
+    # First, try to find persistent AppImages
+    local latest_persistent=$(find "$APPIMAGE_DIR" -maxdepth 1 -name "Claude_Desktop-*-aarch64-persistent.AppImage" -type f 2>/dev/null | sort -V | tail -n 1)
+
+    # If persistent version exists, use it
+    if [ -n "$latest_persistent" ] && [ -f "$latest_persistent" ]; then
+        echo "$latest_persistent"
+        return 0
+    fi
+
+    # Otherwise, find any Claude Desktop AppImage
+    local latest_any=$(find "$APPIMAGE_DIR" -maxdepth 1 -name "Claude_Desktop-*-aarch64.AppImage" -type f 2>/dev/null | sort -V | tail -n 1)
+
+    if [ -n "$latest_any" ] && [ -f "$latest_any" ]; then
+        echo "$latest_any"
+        return 0
+    fi
+
+    return 1
+}
+
+# Detect the latest AppImage
+APPIMAGE_PATH=$(find_latest_appimage)
 
 # Trap signals to cleanup on exit
 trap 'cleanup_on_exit' EXIT INT TERM
@@ -126,13 +151,14 @@ check_and_update_appimage() {
     local GITHUB_API_URL="https://api.github.com/repos/aaddrick/claude-desktop-debian/releases/latest"
     local CURRENT_APPIMAGE_VERSION=""
 
-    if [ -f "$APPIMAGE_PATH" ]; then
+    if [ -n "$APPIMAGE_PATH" ] && [ -f "$APPIMAGE_PATH" ]; then
         # Extract version from the existing AppImage filename
-        # Expected format: Claude_Desktop-X.Y.Z-aarch64-persistent.AppImage
-        CURRENT_APPIMAGE_VERSION=$(basename "$APPIMAGE_PATH" | sed -n 's/Claude_Desktop-\([0-9]\+\.[0-9]\+\.[0-9]\+\)-aarch64-persistent\.AppImage/\1/p')
+        # Expected format: Claude_Desktop-X.Y.Z-aarch64[-persistent].AppImage
+        CURRENT_APPIMAGE_VERSION=$(basename "$APPIMAGE_PATH" | sed -n 's/Claude_Desktop-\([0-9]\+\.[0-9]\+\.[0-9]\+\)-aarch64.*\.AppImage/\1/p')
+        log_info "Current AppImage: $(basename "$APPIMAGE_PATH")"
         log_info "Current AppImage version: $CURRENT_APPIMAGE_VERSION"
     else
-        log_warn "No existing AppImage found at $APPIMAGE_PATH. Will attempt to download the latest."
+        log_warn "No existing AppImage found in $APPIMAGE_DIR. Will attempt to download the latest."
     fi
 
     # Check for curl and jq
@@ -162,12 +188,18 @@ check_and_update_appimage() {
 
     if [ -z "$CURRENT_APPIMAGE_VERSION" ] || version_gt "$LATEST_VERSION" "$CURRENT_APPIMAGE_VERSION"; then
         log_info "Newer version available or no existing AppImage. Downloading $LATEST_VERSION..."
+        local NEW_APPIMAGE_PATH="$APPIMAGE_DIR/Claude_Desktop-${LATEST_VERSION}-aarch64-persistent.AppImage"
         local TEMP_APPIMAGE="/tmp/Claude_Desktop-${LATEST_VERSION}-aarch64.AppImage"
+
         if curl -L -o "$TEMP_APPIMAGE" "$DOWNLOAD_URL"; then
-            log_info "Download complete. Replacing old AppImage..."
-            mv "$TEMP_APPIMAGE" "$APPIMAGE_PATH"
-            chmod +x "$APPIMAGE_PATH"
-            log_info "AppImage updated to version $LATEST_VERSION."
+            log_info "Download complete. Installing new AppImage..."
+            mkdir -p "$APPIMAGE_DIR"
+            mv "$TEMP_APPIMAGE" "$NEW_APPIMAGE_PATH"
+            chmod +x "$NEW_APPIMAGE_PATH"
+            log_info "AppImage installed to $NEW_APPIMAGE_PATH"
+
+            # Update APPIMAGE_PATH to the new file
+            APPIMAGE_PATH="$NEW_APPIMAGE_PATH"
         else
             log_error "Failed to download the new AppImage."
             return 1
@@ -224,12 +256,19 @@ main() {
     # Check and update AppImage before proceeding
     check_and_update_appimage
 
+    # Re-detect AppImage path after potential update
+    if [ -z "$APPIMAGE_PATH" ] || [ ! -f "$APPIMAGE_PATH" ]; then
+        APPIMAGE_PATH=$(find_latest_appimage)
+    fi
+
     # Check if AppImage exists after potential update
-    if [ ! -f "$APPIMAGE_PATH" ]; then
-        log_error "AppImage not found: $APPIMAGE_PATH. Automatic update failed or no AppImage available."
-        log_info "Please ensure the AppImage is present or check your internet connection and GitHub access."
+    if [ -z "$APPIMAGE_PATH" ] || [ ! -f "$APPIMAGE_PATH" ]; then
+        log_error "AppImage not found in $APPIMAGE_DIR. Automatic update failed or no AppImage available."
+        log_info "Please ensure an AppImage is present or check your internet connection and GitHub access."
         exit 1
     fi
+
+    log_info "Using AppImage: $(basename "$APPIMAGE_PATH")"
 
     # Make AppImage executable (redundant if updated, but safe)
     chmod +x "$APPIMAGE_PATH"
