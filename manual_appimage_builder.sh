@@ -5,7 +5,25 @@ echo "=== Manual AppImage Builder for ARM64 ==="
 
 WORK_DIR="$(pwd)/build"
 APP_DIR="$WORK_DIR/ClaudeDesktop.AppDir"
-VERSION="0.9.3"
+
+# Auto-detect version from build artifacts
+NUPKG_FILE=$(find "$WORK_DIR" -name "AnthropicClaude-*.nupkg" -print -quit 2>/dev/null || true)
+if [ -n "$NUPKG_FILE" ]; then
+    VERSION=$(basename "$NUPKG_FILE" | grep -oP 'AnthropicClaude-\K[0-9]+\.[0-9]+\.[0-9]+(?=-full)' || true)
+fi
+
+# Fallback: check desktop file for version
+if [ -z "$VERSION" ] && [ -f "$APP_DIR/claude-desktop.desktop" ]; then
+    VERSION=$(grep "X-AppImage-Version=" "$APP_DIR/claude-desktop.desktop" 2>/dev/null | cut -d'=' -f2 || true)
+fi
+
+# Final fallback to a default
+if [ -z "$VERSION" ]; then
+    VERSION="0.14.10"
+    echo "⚠️  Could not detect version, using default: $VERSION"
+else
+    echo "✓ Detected version: $VERSION"
+fi
 
 if [ ! -d "$APP_DIR" ]; then
     echo "❌ AppDir not found. Run the main build script first."

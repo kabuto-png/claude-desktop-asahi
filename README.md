@@ -37,21 +37,21 @@
 git clone https://github.com/yourusername/claude-desktop-to-appimage.git
 cd claude-desktop-to-appimage
 
-# Build the AppImage (auto-detects your system)
+# Build the AppImage (auto-detects your system and version)
 ./build-appimage.sh
 
-# Run Claude Desktop
-./Claude_Desktop-0.9.3-aarch64.AppImage
+# Run Claude Desktop (version number auto-detected, currently 0.14.10)
+./Claude_Desktop-*-aarch64.AppImage
 ```
 
 ### Add Data Persistence
 
 ```bash
-# Make your data persistent across runs
+# Make your data persistent across runs (auto-detects the AppImage)
 ./add_persistence_simple.sh
 
 # Run the persistent version
-./Claude_Desktop-0.9.3-aarch64-persistent.AppImage
+./Claude_Desktop-*-aarch64-persistent.AppImage
 ```
 
 ## 📋 System Requirements
@@ -76,6 +76,37 @@ cd claude-desktop-to-appimage
 
 *The build script will check for missing dependencies and guide you through installation.*
 
+## 📦 Version Management
+
+The build scripts **automatically detect** the Claude Desktop version from the installer. The current latest version is **0.14.10** (as of January 2025).
+
+### Version Auto-Detection
+
+- The version is extracted from the downloaded installer filename
+- No hardcoded versions - always builds with the correct version number
+- AppImage files are named: `Claude_Desktop-<version>-<arch>.AppImage`
+
+### Getting the Latest Version
+
+The default download URL in the script may be updated periodically. To ensure you have the absolute latest:
+
+1. **Check for newer URLs**: Visit [claude.com/download](https://claude.com/download) (or check community sources)
+2. **Use custom URL**:
+   ```bash
+   ./build-appimage.sh --claude-download-url "https://your-latest-url/Claude-Setup-arm64.exe"
+   ```
+3. **Rebuild anytime**: Simply run `./build-appimage.sh` again to rebuild with a newer version
+
+### Check Your AppImage Version
+
+```bash
+# Check the filename
+ls Claude_Desktop-*.AppImage
+
+# Or use the version checker script
+./check_appimage_version.sh Claude_Desktop-*.AppImage
+```
+
 ## 🔧 Advanced Usage
 
 ### Command Line Options
@@ -84,7 +115,7 @@ cd claude-desktop-to-appimage
 # Basic usage
 ./build-appimage.sh
 
-# Custom Claude download URL
+# Custom Claude download URL for latest version
 ./build-appimage.sh --claude-download-url "https://custom-url/claude.exe"
 
 # Use custom appimagetool path

@@ -3,11 +3,21 @@ set -e
 
 echo "=== Adding Data Persistence to Claude AppImage ==="
 
-# Check if the AppImage exists
-APPIMAGE="Claude_Desktop-0.9.3-aarch64.AppImage"
-if [ ! -f "$APPIMAGE" ]; then
-    echo "❌ AppImage not found: $APPIMAGE"
+# Auto-detect the AppImage file
+APPIMAGE=$(find . -maxdepth 1 -name "Claude_Desktop-*.AppImage" ! -name "*-persistent.AppImage" -print -quit 2>/dev/null)
+
+if [ -z "$APPIMAGE" ]; then
+    echo "❌ AppImage not found. Expected file like: Claude_Desktop-*.AppImage"
+    echo "Available AppImages in current directory:"
+    ls -1 Claude_Desktop-*.AppImage 2>/dev/null || echo "  (none found)"
     exit 1
+fi
+
+# Extract version from filename
+VERSION=$(basename "$APPIMAGE" | grep -oP 'Claude_Desktop-\K[0-9]+\.[0-9]+\.[0-9]+(?=-)')
+if [ -z "$VERSION" ]; then
+    echo "⚠️  Could not detect version from filename, using default"
+    VERSION="0.14.10"
 fi
 
 echo "Found AppImage: $APPIMAGE"
@@ -91,8 +101,9 @@ echo "Creating SquashFS filesystem..."
 mksquashfs squashfs-root filesystem-persistent.squashfs -root-owned -noappend -comp xz
 
 echo "Assembling persistent AppImage..."
-cat runtime-aarch64 filesystem-persistent.squashfs > Claude_Desktop-0.9.3-aarch64-persistent.AppImage
-chmod +x Claude_Desktop-0.9.3-aarch64-persistent.AppImage
+PERSISTENT_APPIMAGE="Claude_Desktop-${VERSION}-aarch64-persistent.AppImage"
+cat runtime-aarch64 filesystem-persistent.squashfs > "$PERSISTENT_APPIMAGE"
+chmod +x "$PERSISTENT_APPIMAGE"
 
 # Clean up
 rm -rf squashfs-root filesystem-persistent.squashfs
@@ -102,7 +113,7 @@ echo "✅ SUCCESS! Created persistent Claude AppImage!"
 echo ""
 echo "Files created:"
 echo "  Original: $APPIMAGE"
-echo "  Persistent: Claude_Desktop-0.9.3-aarch64-persistent.AppImage"
+echo "  Persistent: $PERSISTENT_APPIMAGE"
 echo ""
 echo "Your data will now persist in:"
 echo "  Configuration: ~/.config/Claude/"
@@ -110,4 +121,4 @@ echo "  App Data:      ~/.local/share/Claude/"
 echo "  Cache:         ~/.cache/Claude/"
 echo ""
 echo "Test the persistent version:"
-echo "./Claude_Desktop-0.9.3-aarch64-persistent.AppImage"
+echo "./$PERSISTENT_APPIMAGE"
