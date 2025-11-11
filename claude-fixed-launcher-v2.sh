@@ -8,6 +8,8 @@
 APPIMAGE_DIR="/home/longne/Documents/claude-desktop-to-appimage"
 LOCK_FILE="/tmp/claude-desktop.lock"
 PID_FILE="$HOME/.cache/claude-desktop.pid"
+UPDATE_CHECK_FILE="$HOME/.cache/claude-desktop-update-check"
+UPDATE_CHECK_INTERVAL=$((30 * 24 * 60 * 60))  # 30 days in seconds
 
 # Function to find the latest AppImage in the directory
 find_latest_appimage() {
@@ -144,9 +146,38 @@ setup_environment() {
     mkdir -p "$XDG_CACHE_HOME/Claude"
 }
 
+# Function to check if update check is needed
+should_check_for_updates() {
+    # If no AppImage exists, always check
+    if [ -z "$APPIMAGE_PATH" ] || [ ! -f "$APPIMAGE_PATH" ]; then
+        return 0
+    fi
+
+    # If update check file doesn't exist, check
+    if [ ! -f "$UPDATE_CHECK_FILE" ]; then
+        return 0
+    fi
+
+    # Check if enough time has passed since last check
+    local LAST_CHECK=$(cat "$UPDATE_CHECK_FILE" 2>/dev/null || echo "0")
+    local CURRENT_TIME=$(date +%s)
+    local TIME_DIFF=$((CURRENT_TIME - LAST_CHECK))
+
+    if [ $TIME_DIFF -ge $UPDATE_CHECK_INTERVAL ]; then
+        return 0
+    fi
+
+    return 1
+}
+
 # Function to check for and update AppImage
 check_and_update_appimage() {
-    log_info "Checking for latest Claude Desktop AppImage..."
+    # Skip update check if not needed
+    if ! should_check_for_updates; then
+        return 0
+    fi
+
+    log_info "Checking for updates (last checked: $([ -f "$UPDATE_CHECK_FILE" ] && date -d @$(cat "$UPDATE_CHECK_FILE") '+%Y-%m-%d' || echo 'never'))..."
 
     local GITHUB_API_URL="https://api.github.com/repos/aaddrick/claude-desktop-debian/releases/latest"
     local CURRENT_APPIMAGE_VERSION=""
@@ -155,58 +186,67 @@ check_and_update_appimage() {
         # Extract version from the existing AppImage filename
         # Expected format: Claude_Desktop-X.Y.Z-aarch64[-persistent].AppImage
         CURRENT_APPIMAGE_VERSION=$(basename "$APPIMAGE_PATH" | sed -n 's/Claude_Desktop-\([0-9]\+\.[0-9]\+\.[0-9]\+\)-aarch64.*\.AppImage/\1/p')
-        log_info "Current AppImage: $(basename "$APPIMAGE_PATH")"
-        log_info "Current AppImage version: $CURRENT_APPIMAGE_VERSION"
-    else
-        log_warn "No existing AppImage found in $APPIMAGE_DIR. Will attempt to download the latest."
     fi
 
-    # Check for curl and jq
-    if ! command -v curl &> /dev/null; then
-        log_error "curl is not installed. Please install it to enable automatic updates (e.g., sudo dnf install curl)."
-        return 1
-    fi
-    if ! command -v jq &> /dev/null; then
-        log_error "jq is not installed. Please install it to enable automatic updates (e.g., sudo dnf install jq)."
-        return 1
+    # Check for required tools
+    if ! command -v curl &> /dev/null || ! command -v jq &> /dev/null; then
+        # Silently skip update check if tools are missing
+        return 0
     fi
 
-    local LATEST_RELEASE_INFO=$(curl -s "$GITHUB_API_URL")
-    local LATEST_VERSION=$(echo "$LATEST_RELEASE_INFO" | jq -r '.tag_name' | sed 's/v//') # Remove 'v' prefix
-    local DOWNLOAD_URL=$(echo "$LATEST_RELEASE_INFO" | jq -r '.assets[] | select(.name | contains("arm64.AppImage")) | .browser_download_url')
+    # Fetch latest release info
+    local LATEST_RELEASE_INFO=$(curl -s "$GITHUB_API_URL" 2>/dev/null)
+    if [ -z "$LATEST_RELEASE_INFO" ]; then
+        # Silently skip if GitHub is unreachable
+        return 0
+    fi
+
+    # Extract the actual Claude Desktop version from the asset filename
+    local ASSET_NAME=$(echo "$LATEST_RELEASE_INFO" | jq -r '.assets[] | select(.name | contains("arm64.AppImage") and (contains("arm64.AppImage.zsync") | not)) | .name' 2>/dev/null | head -1)
+    local DOWNLOAD_URL=$(echo "$LATEST_RELEASE_INFO" | jq -r '.assets[] | select(.name | contains("arm64.AppImage") and (contains("arm64.AppImage.zsync") | not)) | .browser_download_url' 2>/dev/null | head -1)
+    local LATEST_VERSION=$(echo "$ASSET_NAME" | sed -n 's/claude-desktop-\([0-9]\+\.[0-9]\+\.[0-9]\+\)-arm64\.AppImage/\1/p')
 
     if [ -z "$LATEST_VERSION" ] || [ -z "$DOWNLOAD_URL" ]; then
-        log_error "Could not retrieve latest release information or download URL from GitHub."
-        return 1
+        # Silently skip if we can't parse the response
+        return 0
     fi
 
-    log_info "Latest available version: $LATEST_VERSION"
+    # Update the last check timestamp
+    date +%s > "$UPDATE_CHECK_FILE"
 
+    # Compare versions
+    if [ -n "$CURRENT_APPIMAGE_VERSION" ] && [ "$LATEST_VERSION" = "$CURRENT_APPIMAGE_VERSION" ]; then
+        log_info "You have the latest version (v$CURRENT_APPIMAGE_VERSION)."
+        return 0
+    fi
+
+    # Version comparison function
     version_gt() {
-    test "$(printf '%s\n' "$1" "$2" | sort -V | head -n 1)" = "$2"
-}
+        test "$(printf '%s\n' "$1" "$2" | sort -V | head -n 1)" != "$1"
+    }
 
     if [ -z "$CURRENT_APPIMAGE_VERSION" ] || version_gt "$LATEST_VERSION" "$CURRENT_APPIMAGE_VERSION"; then
-        log_info "Newer version available or no existing AppImage. Downloading $LATEST_VERSION..."
+        log_info "New version available: v$LATEST_VERSION (current: v${CURRENT_APPIMAGE_VERSION:-none})"
+        log_info "Downloading update..."
+
         local NEW_APPIMAGE_PATH="$APPIMAGE_DIR/Claude_Desktop-${LATEST_VERSION}-aarch64-persistent.AppImage"
         local TEMP_APPIMAGE="/tmp/Claude_Desktop-${LATEST_VERSION}-aarch64.AppImage"
 
-        if curl -L -o "$TEMP_APPIMAGE" "$DOWNLOAD_URL"; then
-            log_info "Download complete. Installing new AppImage..."
+        if curl -L -f -o "$TEMP_APPIMAGE" "$DOWNLOAD_URL" 2>/dev/null; then
+            log_info "Download complete. Installing..."
             mkdir -p "$APPIMAGE_DIR"
             mv "$TEMP_APPIMAGE" "$NEW_APPIMAGE_PATH"
             chmod +x "$NEW_APPIMAGE_PATH"
-            log_info "AppImage installed to $NEW_APPIMAGE_PATH"
+            log_info "✓ Updated to v$LATEST_VERSION"
 
             # Update APPIMAGE_PATH to the new file
             APPIMAGE_PATH="$NEW_APPIMAGE_PATH"
         else
-            log_error "Failed to download the new AppImage."
-            return 1
+            # Silently continue with existing version
+            rm -f "$TEMP_APPIMAGE" 2>/dev/null
         fi
-    else
-        log_info "You are already on the latest version ($CURRENT_APPIMAGE_VERSION)."
     fi
+
     return 0
 }
 
