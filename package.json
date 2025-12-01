@@ -3,6 +3,6 @@
   "version": "1.0.0",
   "private": true,
   "devDependencies": {
-    "electron": "^39.1.1"
+    "electron": "^39.2.4"
   }
 }

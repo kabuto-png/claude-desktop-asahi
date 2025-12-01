@@ -20,7 +20,7 @@ echo "Distribution: $(grep PRETTY_NAME /etc/os-release | cut -d'"' -f2)"
 
 # Configuration
 ELECTRON_BUNDLED=1  # Always bundle on Asahi for compatibility
-CLAUDE_DOWNLOAD_URL="https://storage.googleapis.com/osprey-downloads-c02f6a0d-347c-492b-a752-3e0651722e97/nest-win-arm64/Claude-Setup-arm64.exe"
+CLAUDE_DOWNLOAD_URL="https://downloads.claude.ai/releases/win32/arm64/1.0.1307/Claude-1ed8835ce5539ba2a894ab752752be672a17c0d8.exe"
 APP_IMAGE_TOOL="/usr/local/bin/appimagetool"
 
 # Parse command line arguments
@@ -272,6 +272,7 @@ cd electron-app
 asar extract app.asar app.asar.contents
 
 # Create stub native module
+mkdir -p app.asar.contents/node_modules/claude-native
 cat > app.asar.contents/node_modules/claude-native/index.js << 'EOFSTUB'
 const KeyboardKey = {
   Backspace: 43, Tab: 280, Enter: 261, Shift: 272, Control: 61, Alt: 40,

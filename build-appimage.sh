@@ -9,7 +9,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Configuration defaults
 APPIMAGETOOL_PATH="/usr/local/bin/appimagetool"
 BUNDLE_ELECTRON=0
-CLAUDE_DOWNLOAD_URL="https://claude.ai/download"
+CLAUDE_DOWNLOAD_URL="https://downloads.claude.ai/releases/win32/arm64/1.0.1307/Claude-1ed8835ce5539ba2a894ab752752be672a17c0d8.exe"
 ARCH=$(uname -m)
 
 # Colors for output
