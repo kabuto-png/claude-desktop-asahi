@@ -329,10 +329,17 @@ module.exports = {
 EOFSTUB2
 
 # Copy Electron if bundled
-if [ "$ELECTRON_BUNDLED" -eq 1 ] && [ -d "$(pwd)/../node_modules/electron" ]; then
-    mkdir -p "$APP_DIR/usr/lib/claude-desktop/node_modules"
-    cp -r "$(pwd)/../node_modules/electron" "$APP_DIR/usr/lib/claude-desktop/node_modules/"
-    echo "✓ Bundled Electron copied to AppDir"
+if [ "$ELECTRON_BUNDLED" -eq 1 ]; then
+    echo "Copying Electron to AppDir..."
+    # Try to find Electron in the project's node_modules
+    if [ -d "$CURRENT_DIR/node_modules/electron" ]; then
+        mkdir -p "$APP_DIR/usr/lib/claude-desktop/node_modules"
+        cp -r "$CURRENT_DIR/node_modules/electron" "$APP_DIR/usr/lib/claude-desktop/node_modules/"
+        echo "✓ Bundled Electron copied to AppDir from $CURRENT_DIR/node_modules/electron"
+    else
+        echo "❌ Electron not found in $CURRENT_DIR/node_modules/electron"
+        exit 1
+    fi
 fi
 
 # Create AppRun for Fedora Asahi
