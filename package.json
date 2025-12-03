@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "devDependencies": {
+    "@electron/asar": "^3.2.18",
     "electron": "^39.2.4"
   }
 }

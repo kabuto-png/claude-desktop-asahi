@@ -172,12 +172,14 @@ else
     echo "✓ Electron available"
 fi
 
-# Install asar
-if ! command -v asar &>/dev/null; then
-    echo "Installing asar..."
-    npm install -g asar
+# Install asar locally
+if ! command -v asar &>/dev/null && [ ! -f "node_modules/.bin/asar" ]; then
+    echo "Installing asar locally..."
+    npm install --save-dev @electron/asar
 fi
-export PATH="/home/longne/.npm-global/bin:$PATH"
+
+# Add local node_modules to PATH
+export PATH="$(pwd)/node_modules/.bin:$PATH"
 
 CURRENT_DIR="$(pwd)"
 WORK_DIR="$CURRENT_DIR/build"
