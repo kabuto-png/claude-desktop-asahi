@@ -9,7 +9,8 @@ echo "DEBUG: Arguments: $*"
 
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-APPIMAGE_PATH=$(/usr/bin/find "$SCRIPT_DIR" -maxdepth 1 -name "Claude_Desktop-*-aarch64*.AppImage" -type f 2>/dev/null | sort -V | tail -n 1)
+PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+APPIMAGE_PATH=$(/usr/bin/find "$PROJECT_DIR" -maxdepth 1 -name "Claude_Desktop-*-aarch64*.AppImage" -type f 2>/dev/null | sort -V | tail -n 1)
 
 # Colors for output
 RED='\033[0;31m'

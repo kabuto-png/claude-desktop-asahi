@@ -6,7 +6,8 @@
 
 
 # Configuration
-APPIMAGE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+APPIMAGE_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 LOCK_FILE="/tmp/claude-desktop.lock"
 PID_FILE="$HOME/.cache/claude-desktop.pid"
 UPDATE_CHECK_FILE="$HOME/.cache/claude-desktop-update-check"
