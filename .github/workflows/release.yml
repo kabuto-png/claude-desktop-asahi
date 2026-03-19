@@ -85,51 +85,77 @@ jobs:
       - name: Download Claude Desktop installer
         run: |
           RELEASES_URL="https://downloads.claude.ai/releases/win32/arm64/RELEASES"
+          mkdir -p build
 
           if [ -n "${{ inputs.claude_download_url }}" ]; then
-            DOWNLOAD_URL="${{ inputs.claude_download_url }}"
+            echo "Using provided URL"
+            curl -L -f --progress-bar -o build/claude-installer.exe "${{ inputs.claude_download_url }}"
           else
-            # Parse RELEASES to get nupkg filename and construct URL
+            # Parse RELEASES to get nupkg filename
             RELEASES=$(curl -sf "$RELEASES_URL")
-            NUPKG=$(echo "$RELEASES" | tail -1 | awk '{print $2}')
-            DOWNLOAD_URL="https://downloads.claude.ai/releases/win32/arm64/${VERSION}/${NUPKG}"
+            if [ -z "$RELEASES" ]; then
+              echo "::error::Could not fetch RELEASES endpoint"
+              exit 1
+            fi
 
-            # If nupkg URL doesn't work, try the exe pattern
-            if ! curl -sf --head "$DOWNLOAD_URL" &>/dev/null; then
-              echo "Nupkg URL failed, trying GitHub fallback..."
-              DOWNLOAD_URL=$(curl -sf "https://api.github.com/repos/aaddrick/claude-desktop-debian/releases/latest" \
-                | jq -r '.assets[] | select(.name | endswith(".exe")) | .browser_download_url' | head -1)
+            NUPKG=$(echo "$RELEASES" | tail -1 | awk '{print $2}')
+            echo "Found nupkg: $NUPKG"
+
+            # Download nupkg directly (contains the app.asar we need)
+            NUPKG_URL="https://downloads.claude.ai/releases/win32/arm64/${VERSION}/${NUPKG}"
+            echo "Downloading from: $NUPKG_URL"
+
+            if curl -L -f --progress-bar -o "build/${NUPKG}" "$NUPKG_URL"; then
+              echo "Downloaded nupkg successfully"
+            else
+              echo "Direct nupkg download failed, trying full URL construction..."
+              # Try without version prefix (some CDN layouts differ)
+              NUPKG_URL2="https://downloads.claude.ai/releases/win32/arm64/${NUPKG}"
+              curl -L -f --progress-bar -o "build/${NUPKG}" "$NUPKG_URL2"
             fi
           fi
 
-          echo "Downloading from: $DOWNLOAD_URL"
-          mkdir -p build
-          curl -L -f --progress-bar -o build/claude-installer.exe "$DOWNLOAD_URL"
-
-          FILE_SIZE=$(stat -c%s build/claude-installer.exe)
-          echo "Downloaded installer: $(numfmt --to=iec $FILE_SIZE)"
+          ls -la build/
+          echo "Download complete"
 
       - name: Extract app.asar from installer
         run: |
           cd build
 
-          # Extract using 7z (handles both NSIS and Squirrel installers)
-          7z x -y claude-installer.exe -oinstaller_contents/ || true
+          # Find what we downloaded (nupkg or exe)
+          DOWNLOADED=$(ls *.nupkg *.exe 2>/dev/null | head -1)
+          if [ -z "$DOWNLOADED" ]; then
+            echo "::error::No installer file found in build/"
+            ls -la
+            exit 1
+          fi
+          echo "Extracting: $DOWNLOADED"
 
-          # Find the nupkg inside
-          NUPKG=$(find installer_contents/ -name "*.nupkg" -print -quit 2>/dev/null || true)
-          if [ -n "$NUPKG" ]; then
-            echo "Found nupkg: $NUPKG"
-            7z x -y "$NUPKG" -onupkg_contents/
-            ASAR=$(find nupkg_contents/ -name "app.asar" -print -quit)
-          else
-            # Direct extraction (some installer formats)
-            ASAR=$(find installer_contents/ -name "app.asar" -print -quit)
+          # Extract with 7z (handles nupkg, exe, nsis, squirrel)
+          7z x -y "$DOWNLOADED" -oextracted/ || true
+
+          # If we extracted an exe and it contains a nupkg inside, extract that too
+          INNER_NUPKG=$(find extracted/ -name "*.nupkg" -print -quit 2>/dev/null || true)
+          if [ -n "$INNER_NUPKG" ]; then
+            echo "Found inner nupkg: $INNER_NUPKG"
+            7z x -y "$INNER_NUPKG" -onupkg_contents/
+            ASAR=$(find nupkg_contents/ -name "app.asar" -print -quit 2>/dev/null)
+          fi
+
+          # If no asar found yet, search extracted directory
+          if [ -z "$ASAR" ] || [ ! -f "$ASAR" ]; then
+            ASAR=$(find extracted/ -name "app.asar" -print -quit 2>/dev/null)
+          fi
+
+          # Also check lib/net45 path (nupkg layout)
+          if [ -z "$ASAR" ] || [ ! -f "$ASAR" ]; then
+            ASAR=$(find . -path "*/lib/net45/resources/app.asar" -print -quit 2>/dev/null)
           fi
 
           if [ -z "$ASAR" ] || [ ! -f "$ASAR" ]; then
-            echo "::error::Could not find app.asar in installer"
-            find . -name "*.asar" 2>/dev/null
+            echo "::error::Could not find app.asar"
+            echo "Directory contents:"
+            find . -type f | head -30
             exit 1
           fi
 
@@ -259,7 +285,7 @@ jobs:
           DESKTOP
 
           # Extract icon from installer or use placeholder
-          ICON_SRC=$(find installer_contents/ nupkg_contents/ -name "*.ico" -print -quit 2>/dev/null || true)
+          ICON_SRC=$(find extracted/ nupkg_contents/ -name "*.ico" -print -quit 2>/dev/null || true)
           if [ -n "$ICON_SRC" ]; then
             # Convert .ico to .png
             wrestool -x -t 14 "$ICON_SRC" 2>/dev/null | convert ico:- -resize 256x256 "$APP_DIR/claude-desktop.png" 2>/dev/null || \
