@@ -208,25 +208,12 @@ jobs:
           cd build/app_source
 
           # Create claude-native stubs for all known import paths
+          STUB_JS='const KeyboardKey = { Backspace: 43, Tab: 280, Enter: 261, Shift: 272, Control: 61, Alt: 40, CapsLock: 56, Escape: 85, Space: 276, PageUp: 251, PageDown: 250, End: 83, Home: 154, LeftArrow: 175, UpArrow: 282, RightArrow: 262, DownArrow: 81, Delete: 79, Meta: 187 }; module.exports = { getWindowsVersion: () => "10.0.0", setWindowEffect: () => {}, removeWindowEffect: () => {}, flashFrame: () => {}, showNotification: () => {}, KeyboardKey };'
+          STUB_PKG='{"name":"claude-native","version":"1.0.0","main":"index.js"}'
           for NATIVE_DIR in "node_modules/claude-native" "node_modules/@anthropic-ai/claude-native" "node_modules/@ant/claude-native"; do
             mkdir -p "$NATIVE_DIR"
-            cat > "$NATIVE_DIR/index.js" << 'STUBEOF'
-const KeyboardKey = {
-  Backspace: 43, Tab: 280, Enter: 261, Shift: 272, Control: 61, Alt: 40,
-  CapsLock: 56, Escape: 85, Space: 276, PageUp: 251, PageDown: 250,
-  End: 83, Home: 154, LeftArrow: 175, UpArrow: 282, RightArrow: 262,
-  DownArrow: 81, Delete: 79, Meta: 187
-};
-module.exports = {
-  getWindowsVersion: () => "10.0.0",
-  setWindowEffect: () => {}, removeWindowEffect: () => {},
-  flashFrame: () => {}, showNotification: () => {},
-  KeyboardKey
-};
-STUBEOF
-            cat > "$NATIVE_DIR/package.json" << 'PKGEOF'
-{"name":"claude-native","version":"1.0.0","main":"index.js"}
-PKGEOF
+            echo "$STUB_JS" > "$NATIVE_DIR/index.js"
+            echo "$STUB_PKG" > "$NATIVE_DIR/package.json"
           done
 
           echo "Native stubs installed"
@@ -264,32 +251,12 @@ PKGEOF
           # Copy patched app.asar
           cp app-patched.asar "$APP_DIR/usr/lib/claude-desktop/resources/app.asar"
 
-          # Create AppRun (heredoc must start at column 0 for valid shebang)
-          cat > "$APP_DIR/AppRun" << 'APPRUN'
-#!/bin/bash
-SELF_DIR="$(dirname "$(readlink -f "$0")")"
-export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
-export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
-export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
-mkdir -p "$XDG_CONFIG_HOME/Claude" "$XDG_DATA_HOME/Claude" "$XDG_CACHE_HOME/Claude"
-exec "$SELF_DIR/usr/lib/claude-desktop/electron" \
-  --no-sandbox \
-  "$SELF_DIR/usr/lib/claude-desktop/resources/app.asar" \
-  "$@"
-APPRUN
+          # Create AppRun
+          printf '#!/bin/bash\nSELF_DIR="$(dirname "$(readlink -f "$0")")"\nexport XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"\nexport XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"\nexport XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"\nmkdir -p "$XDG_CONFIG_HOME/Claude" "$XDG_DATA_HOME/Claude" "$XDG_CACHE_HOME/Claude"\nexec "$SELF_DIR/usr/lib/claude-desktop/electron" --no-sandbox "$SELF_DIR/usr/lib/claude-desktop/resources/app.asar" "$@"\n' > "$APP_DIR/AppRun"
           chmod +x "$APP_DIR/AppRun"
 
           # Create desktop entry
-          cat > "$APP_DIR/claude-desktop.desktop" << DESKTOP
-[Desktop Entry]
-Name=Claude Desktop
-Exec=AppRun %u
-Icon=claude-desktop
-Type=Application
-Categories=Network;Chat;
-Comment=Claude Desktop for Linux
-X-AppImage-Version=${VERSION}
-DESKTOP
+          printf '[Desktop Entry]\nName=Claude Desktop\nExec=AppRun %%u\nIcon=claude-desktop\nType=Application\nCategories=Network;Chat;\nComment=Claude Desktop for Linux\nX-AppImage-Version=%s\n' "${VERSION}" > "$APP_DIR/claude-desktop.desktop"
 
           # Extract icon — try .ico from installer, fallback to generated PNG
           ICON_SRC=$(find extracted/ nupkg_contents/ -name "*.ico" -print -quit 2>/dev/null || true)
