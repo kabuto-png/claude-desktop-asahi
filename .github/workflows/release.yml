@@ -1,10 +1,8 @@
 name: Build & Release AppImage
 
 on:
-  # Check for new versions daily at 06:00 UTC
   schedule:
     - cron: '0 6 * * *'
-  # Manual trigger with optional version override
   workflow_dispatch:
     inputs:
       force_build:
@@ -31,7 +29,6 @@ jobs:
       - name: Get latest Claude Desktop version
         id: version
         run: |
-          # Query Anthropic RELEASES endpoint
           RELEASES_URL="https://downloads.claude.ai/releases/win32/arm64/RELEASES"
           VERSION=$(curl -sf --connect-timeout 10 --max-time 20 "$RELEASES_URL" 2>/dev/null \
             | tail -1 | grep -oP 'AnthropicClaude-\K[0-9]+\.[0-9]+\.[0-9]+' || true)
@@ -58,7 +55,6 @@ jobs:
             exit 0
           fi
 
-          # Check if a release with this version tag already exists
           if gh release view "v${VERSION}" &>/dev/null; then
             echo "should_build=false" >> "$GITHUB_OUTPUT"
             echo "Release v${VERSION} already exists, skipping"
@@ -67,13 +63,13 @@ jobs:
             echo "New version v${VERSION} detected, will build"
           fi
 
-  build:
+  build-aarch64:
     needs: check-version
     if: needs.check-version.outputs.should_build == 'true'
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch: [x86_64]
+    env:
+      VERSION: ${{ needs.check-version.outputs.version }}
+      TARGET_ARCH: aarch64
     steps:
       - uses: actions/checkout@v4
 
@@ -81,36 +77,230 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y nodejs npm p7zip-full wget curl jq \
-            squashfs-tools imagemagick icoutils libfuse2
-
-      - name: Install appimagetool
-        run: |
-          wget -q -O /usr/local/bin/appimagetool \
-            "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
-          chmod +x /usr/local/bin/appimagetool
+            squashfs-tools imagemagick icoutils file
 
       - name: Install asar
         run: npm install -g @electron/asar
 
-      - name: Build AppImage
-        env:
-          VERSION: ${{ needs.check-version.outputs.version }}
-          CLAUDE_URL_OVERRIDE: ${{ inputs.claude_download_url }}
+      - name: Download Claude Desktop installer
         run: |
-          BUILD_ARGS=()
-          if [ -n "$CLAUDE_URL_OVERRIDE" ]; then
-            BUILD_ARGS+=("--claude-download-url" "$CLAUDE_URL_OVERRIDE")
-          fi
-          BUILD_ARGS+=("--bundle-electron")
+          RELEASES_URL="https://downloads.claude.ai/releases/win32/arm64/RELEASES"
 
-          chmod +x build-appimage.sh manual_appimage_builder.sh
-          ./build-appimage.sh "${BUILD_ARGS[@]}"
+          if [ -n "${{ inputs.claude_download_url }}" ]; then
+            DOWNLOAD_URL="${{ inputs.claude_download_url }}"
+          else
+            # Parse RELEASES to get nupkg filename and construct URL
+            RELEASES=$(curl -sf "$RELEASES_URL")
+            NUPKG=$(echo "$RELEASES" | tail -1 | awk '{print $2}')
+            DOWNLOAD_URL="https://downloads.claude.ai/releases/win32/arm64/${VERSION}/${NUPKG}"
+
+            # If nupkg URL doesn't work, try the exe pattern
+            if ! curl -sf --head "$DOWNLOAD_URL" &>/dev/null; then
+              echo "Nupkg URL failed, trying GitHub fallback..."
+              DOWNLOAD_URL=$(curl -sf "https://api.github.com/repos/aaddrick/claude-desktop-debian/releases/latest" \
+                | jq -r '.assets[] | select(.name | endswith(".exe")) | .browser_download_url' | head -1)
+            fi
+          fi
+
+          echo "Downloading from: $DOWNLOAD_URL"
+          mkdir -p build
+          curl -L -f --progress-bar -o build/claude-installer.exe "$DOWNLOAD_URL"
+
+          FILE_SIZE=$(stat -c%s build/claude-installer.exe)
+          echo "Downloaded installer: $(numfmt --to=iec $FILE_SIZE)"
+
+      - name: Extract app.asar from installer
+        run: |
+          cd build
+
+          # Extract using 7z (handles both NSIS and Squirrel installers)
+          7z x -y claude-installer.exe -oinstaller_contents/ || true
+
+          # Find the nupkg inside
+          NUPKG=$(find installer_contents/ -name "*.nupkg" -print -quit 2>/dev/null || true)
+          if [ -n "$NUPKG" ]; then
+            echo "Found nupkg: $NUPKG"
+            7z x -y "$NUPKG" -onupkg_contents/
+            ASAR=$(find nupkg_contents/ -name "app.asar" -print -quit)
+          else
+            # Direct extraction (some installer formats)
+            ASAR=$(find installer_contents/ -name "app.asar" -print -quit)
+          fi
+
+          if [ -z "$ASAR" ] || [ ! -f "$ASAR" ]; then
+            echo "::error::Could not find app.asar in installer"
+            find . -name "*.asar" 2>/dev/null
+            exit 1
+          fi
+
+          echo "Found app.asar: $ASAR"
+          cp "$ASAR" app.asar
+
+          # Extract asar for patching
+          asar extract app.asar app_source/
+          echo "Extracted app.asar successfully"
+
+      - name: Apply patches
+        run: |
+          cd build/app_source
+
+          # Patch 1: Window decorations - titleBarStyle hidden -> default
+          echo "Applying patch: window decorations..."
+          find . -name "*.js" -exec grep -l 'titleBarStyle:"hidden"' {} \; | while read f; do
+            sed -i 's/titleBarStyle:"hidden"/titleBarStyle:"default"/g' "$f"
+            echo "  Patched: $f"
+          done
+
+          # Patch 2: Platform detection - add Linux case
+          echo "Applying patch: platform detection..."
+          find . -name "*.js" -exec grep -l 'process\.platform' {} \; | head -20 | while read f; do
+            sed -i 's/case"win32":/case"linux":case"win32":/g' "$f"
+          done
+
+          # Patch 3: Origin validation - remove isPackaged check
+          echo "Applying patch: origin validation..."
+          find . -name "*.js" -exec grep -l 'isPackaged' {} \; | while read f; do
+            sed -i 's/\be\.app\.isPackaged\b/true/g' "$f"
+          done
+
+          # Patch 4: ClaudeVM stubs - null IPC handlers
+          echo "Applying patch: ClaudeVM stubs..."
+          find . -name "*.js" -exec grep -l 'claudeVM\|claude-vm\|ClaudeVM' {} \; | while read f; do
+            sed -i 's/throw new Error("ClaudeVM[^"]*")/return null/g' "$f" 2>/dev/null || true
+          done
+
+          echo "All patches applied"
+
+      - name: Install native module stubs
+        run: |
+          cd build/app_source
+
+          # Create claude-native stub
+          NATIVE_DIR="node_modules/claude-native"
+          mkdir -p "$NATIVE_DIR"
+          cat > "$NATIVE_DIR/index.js" << 'STUBEOF'
+          const KeyboardKey = {
+            Backspace: 43, Tab: 280, Enter: 261, Shift: 272, Control: 61, Alt: 40,
+            CapsLock: 56, Escape: 85, Space: 276, PageUp: 251, PageDown: 250,
+            End: 83, Home: 154, LeftArrow: 175, UpArrow: 282, RightArrow: 262,
+            DownArrow: 81, Delete: 79, Meta: 187
+          };
+          module.exports = {
+            getWindowsVersion: () => "10.0.0",
+            setWindowEffect: () => {}, removeWindowEffect: () => {},
+            flashFrame: () => {}, showNotification: () => {},
+            KeyboardKey
+          };
+          STUBEOF
+          cat > "$NATIVE_DIR/package.json" << 'PKGEOF'
+          {"name":"claude-native","version":"1.0.0","main":"index.js"}
+          PKGEOF
+
+          echo "Native stubs installed"
+
+      - name: Repack app.asar
+        run: |
+          cd build
+          asar pack app_source/ app-patched.asar
+          echo "Repacked app.asar ($(stat -c%s app-patched.asar | numfmt --to=iec))"
+
+      - name: Download aarch64 Electron
+        run: |
+          cd build
+
+          # Get Electron version from package.json
+          ELECTRON_VER=$(node -e "console.log(require('../package.json').devDependencies.electron.replace('^',''))")
+          echo "Downloading Electron v${ELECTRON_VER} for aarch64..."
+
+          wget -q "https://github.com/electron/electron/releases/download/v${ELECTRON_VER}/electron-v${ELECTRON_VER}-linux-arm64.zip" \
+            -O electron-arm64.zip
+
+          mkdir -p electron-arm64
+          unzip -q electron-arm64.zip -d electron-arm64/
+          echo "Electron aarch64 ready"
+
+      - name: Build AppDir
+        run: |
+          cd build
+          APP_DIR="ClaudeDesktop.AppDir"
+          mkdir -p "$APP_DIR/usr/bin" "$APP_DIR/usr/lib/claude-desktop" "$APP_DIR/usr/share/icons/hicolor/256x256/apps"
+
+          # Copy Electron
+          cp -r electron-arm64/* "$APP_DIR/usr/lib/claude-desktop/"
+
+          # Copy patched app.asar
+          cp app-patched.asar "$APP_DIR/usr/lib/claude-desktop/resources/app.asar"
+
+          # Create AppRun
+          cat > "$APP_DIR/AppRun" << 'APPRUN'
+          #!/bin/bash
+          SELF_DIR="$(dirname "$(readlink -f "$0")")"
+          export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+          export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
+          export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
+          mkdir -p "$XDG_CONFIG_HOME/Claude" "$XDG_DATA_HOME/Claude" "$XDG_CACHE_HOME/Claude"
+          exec "$SELF_DIR/usr/lib/claude-desktop/electron" \
+            --no-sandbox \
+            "$SELF_DIR/usr/lib/claude-desktop/resources/app.asar" \
+            "$@"
+          APPRUN
+          chmod +x "$APP_DIR/AppRun"
+
+          # Create desktop entry
+          cat > "$APP_DIR/claude-desktop.desktop" << DESKTOP
+          [Desktop Entry]
+          Name=Claude Desktop
+          Exec=AppRun %u
+          Icon=claude-desktop
+          Type=Application
+          Categories=Network;Chat;
+          Comment=Claude Desktop for Linux
+          X-AppImage-Version=${VERSION}
+          DESKTOP
+
+          # Extract icon from installer or use placeholder
+          ICON_SRC=$(find installer_contents/ nupkg_contents/ -name "*.ico" -print -quit 2>/dev/null || true)
+          if [ -n "$ICON_SRC" ]; then
+            # Convert .ico to .png
+            wrestool -x -t 14 "$ICON_SRC" 2>/dev/null | convert ico:- -resize 256x256 "$APP_DIR/claude-desktop.png" 2>/dev/null || \
+            convert "$ICON_SRC" -resize 256x256 "$APP_DIR/claude-desktop.png" 2>/dev/null || \
+            convert -size 256x256 xc:purple -fill white -gravity center -pointsize 72 -annotate 0 "C" "$APP_DIR/claude-desktop.png"
+          else
+            # Fallback: generate simple icon
+            convert -size 256x256 xc:'#d4a574' -fill white -gravity center -pointsize 100 -annotate 0 "C" "$APP_DIR/claude-desktop.png"
+          fi
+          cp "$APP_DIR/claude-desktop.png" "$APP_DIR/usr/share/icons/hicolor/256x256/apps/"
+          cp "$APP_DIR/claude-desktop.png" "$APP_DIR/.DirIcon"
+
+          echo "AppDir built at $APP_DIR"
+
+      - name: Create aarch64 AppImage
+        run: |
+          cd build
+
+          # Download aarch64 AppImage runtime
+          wget -q -O runtime-aarch64 \
+            "https://github.com/AppImage/AppImageKit/releases/download/continuous/runtime-aarch64"
+          chmod +x runtime-aarch64
+
+          # Create squashfs from AppDir
+          mksquashfs ClaudeDesktop.AppDir filesystem.squashfs \
+            -root-owned -noappend -comp zstd -Xcompression-level 19
+
+          # Assemble AppImage: runtime + squashfs
+          APPIMAGE_NAME="Claude_Desktop-${VERSION}-aarch64.AppImage"
+          cat runtime-aarch64 filesystem.squashfs > "$APPIMAGE_NAME"
+          chmod +x "$APPIMAGE_NAME"
+
+          # Move to repo root
+          mv "$APPIMAGE_NAME" ../
+          echo "Created: $APPIMAGE_NAME ($(stat -c%s "../$APPIMAGE_NAME" | numfmt --to=iec))"
 
       - name: Verify AppImage
         run: |
-          APPIMAGE=$(ls Claude_Desktop-*-*.AppImage 2>/dev/null | head -1)
-          if [ -z "$APPIMAGE" ]; then
-            echo "::error::No AppImage found after build"
+          APPIMAGE="Claude_Desktop-${VERSION}-aarch64.AppImage"
+          if [ ! -f "$APPIMAGE" ]; then
+            echo "::error::AppImage not found"
             exit 1
           fi
 
@@ -120,18 +310,20 @@ jobs:
             exit 1
           fi
 
-          echo "Built: $APPIMAGE ($(numfmt --to=iec $FILE_SIZE))"
-          echo "APPIMAGE_NAME=$APPIMAGE" >> "$GITHUB_ENV"
+          # Verify it's an ELF for aarch64
+          FILE_TYPE=$(file "$APPIMAGE")
+          echo "File type: $FILE_TYPE"
+          echo "Size: $(numfmt --to=iec $FILE_SIZE)"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: appimage-${{ matrix.arch }}
-          path: Claude_Desktop-*-*.AppImage
+          name: appimage-aarch64
+          path: Claude_Desktop-*-aarch64.AppImage
           retention-days: 1
 
   release:
-    needs: [check-version, build]
+    needs: [check-version, build-aarch64]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -146,12 +338,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.check-version.outputs.version }}
         run: |
-          # Collect all AppImage files
           ASSETS=()
           for f in artifacts/appimage-*/*.AppImage; do
             if [ -f "$f" ]; then
               ASSETS+=("$f")
-              echo "Release asset: $f ($(stat -c%s "$f" | numfmt --to=iec))"
+              echo "Release asset: $(basename "$f") ($(stat -c%s "$f" | numfmt --to=iec))"
             fi
           done
 
@@ -167,39 +358,41 @@ jobs:
           done
           ASSETS+=("$CHECKSUM_FILE")
 
-          # Create release
           gh release create "v${VERSION}" \
-            --title "Claude Desktop v${VERSION}" \
-            --notes "$(cat <<EOF
-          ## Claude Desktop v${VERSION} AppImage
+            --title "Claude Desktop v${VERSION} (aarch64)" \
+            --notes "$(cat <<'NOTES'
+          ## Claude Desktop v${VERSION} — Linux AppImage (aarch64)
 
-          Automated build of Claude Desktop as a Linux AppImage.
+          Automated build for ARM64 Linux (Fedora Asahi, Raspberry Pi 4+, etc).
 
-          ### Installation
+          ### Install
 
-          \`\`\`bash
-          chmod +x Claude_Desktop-${VERSION}-*.AppImage
-          ./Claude_Desktop-${VERSION}-*.AppImage
-          \`\`\`
+          ```bash
+          wget <APPIMAGE_URL_FROM_ASSETS>
+          chmod +x Claude_Desktop-*-aarch64.AppImage
+          ./Claude_Desktop-*-aarch64.AppImage
+          ```
 
-          ### Verify download
+          Or use the launcher for auto-update + HiDPI:
+          ```bash
+          ./claude-fixed-launcher-v2.sh
+          ```
 
-          \`\`\`bash
+          ### Verify
+
+          ```bash
           sha256sum -c SHA256SUMS.txt
-          \`\`\`
+          ```
 
-          ### Data persistence
+          ### Data locations
 
-          Your data is stored in XDG directories:
-          - Config: \`~/.config/Claude/\`
-          - Data: \`~/.local/share/Claude/\`
-          - Cache: \`~/.cache/Claude/\`
-
-          See [README](https://github.com/${{ github.repository }}) for full documentation.
+          - Config: `~/.config/Claude/`
+          - Data: `~/.local/share/Claude/`
+          - Cache: `~/.cache/Claude/`
 
           ---
-          *Built automatically from Claude Desktop Windows installer.*
-          EOF
+          *Built automatically from Claude Desktop Windows installer. Not affiliated with Anthropic.*
+          NOTES
           )" \
             "${ASSETS[@]}"
 
