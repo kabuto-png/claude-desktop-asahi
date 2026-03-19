@@ -57,8 +57,8 @@ Architecture Detection:
   build script. Supported architectures: x86_64, aarch64
 
 Build Scripts Used:
-  - Fedora Asahi (aarch64): fedora_asahi_build_script.sh
-  - Manual builder: manual_appimage_builder.sh
+  - Fedora Asahi (aarch64): scripts/builders/fedora_asahi_build_script.sh
+  - Manual builder: scripts/builders/manual_appimage_builder.sh
   - Rebuild/fix: rebuild_and_fix.sh
 
 EOF
@@ -113,13 +113,13 @@ detect_build_script() {
     
     # Check if we're on Fedora Asahi
     if grep -q "Fedora Linux Asahi" /etc/os-release 2>/dev/null && [ "$ARCH" = "aarch64" ]; then
-        build_script="fedora_asahi_build_script.sh"
+        build_script="scripts/builders/fedora_asahi_build_script.sh"
     # Check for other ARM64 systems
     elif [ "$ARCH" = "aarch64" ]; then
-        build_script="manual_appimage_builder.sh"
+        build_script="scripts/builders/manual_appimage_builder.sh"
     # Default for x86_64 and others
     else
-        build_script="manual_appimage_builder.sh"
+        build_script="scripts/builders/manual_appimage_builder.sh"
     fi
     if [ ! -f "$SCRIPT_DIR/$build_script" ]; then
         log_error "Build script not found: $build_script"
@@ -158,7 +158,7 @@ done
 
 # Auto-detect download URL if not provided
 auto_detect_download_url() {
-    local version_script="$SCRIPT_DIR/check-official-version.sh"
+    local version_script="$SCRIPT_DIR/scripts/version/check-official-version.sh"
     if [ -f "$version_script" ]; then
         source "$version_script"
         local url
@@ -219,7 +219,7 @@ chmod +x "$BUILD_SCRIPT"
 
 if ! ./${BUILD_SCRIPT} "${BUILD_ARGS[@]}"; then
     log_warning "Primary build script ($BUILD_SCRIPT) failed. Attempting manual builder..."
-    MANUAL_BUILDER="manual_appimage_builder.sh"
+    MANUAL_BUILDER="scripts/builders/manual_appimage_builder.sh"
     if [ ! -f "$SCRIPT_DIR/$MANUAL_BUILDER" ]; then
         log_error "Manual builder script not found: $MANUAL_BUILDER"
         exit 1

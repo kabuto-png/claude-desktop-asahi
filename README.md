@@ -21,7 +21,7 @@ cd claude-desktop-to-appimage
 ./Claude_Desktop-*-aarch64.AppImage
 
 # Optional: add data persistence
-./add_persistence_simple.sh
+./scripts/tools/add_persistence_simple.sh
 ./Claude_Desktop-*-aarch64-persistent.AppImage
 ```
 
@@ -50,32 +50,32 @@ The build script checks for missing dependencies and provides installation comma
 
 ## Usage
 
-### Build Options
+### Build
 
 ```bash
 ./build-appimage.sh                              # Auto-detect everything
 ./build-appimage.sh --claude-download-url <url>   # Custom installer URL
 ./build-appimage.sh --bundle-electron             # Bundle Electron runtime
-./fedora_asahi_build_script.sh                    # Fedora Asahi ARM64 specific
-./manual_appimage_builder.sh                      # Manual fallback
+./scripts/builders/fedora_asahi_build_script.sh   # Fedora Asahi ARM64 specific
+./scripts/builders/manual_appimage_builder.sh     # Manual fallback
 ```
 
-### Launcher
+### Launch
 
 ```bash
-./claude-fixed-launcher-v2.sh            # Recommended: auto-update + HiDPI
-./claude-fixed-launcher-v2.sh --scale 2  # Force 2x HiDPI scaling
-./claude-fixed-launcher-v2.sh --diagnose # Auth diagnostics
+./scripts/launcher/claude-launcher.sh            # Recommended: auto-update + HiDPI
+./scripts/launcher/claude-launcher.sh --scale 2  # Force 2x HiDPI scaling
+./scripts/launcher/claude-launcher.sh --diagnose # Auth diagnostics
 ```
 
 ### Tools
 
 ```bash
-./claude-status.sh              # Check running state and version
-./claude-auth-diagnostics.sh    # Diagnose auth/token issues
-./claude-kill.sh                # Kill running instances
-./cleanup-claude.sh             # Remove all Claude data
-./check-official-version.sh     # Check latest version available
+./scripts/tools/claude-status.sh              # Check running state and version
+./scripts/tools/claude-auth-diagnostics.sh    # Diagnose auth/token issues
+./scripts/tools/claude-kill.sh                # Kill running instances
+./scripts/tools/cleanup-claude.sh             # Remove all Claude data
+./scripts/version/check-official-version.sh   # Check latest version available
 ```
 
 ## Data Storage
@@ -90,28 +90,40 @@ All data persists in XDG-compliant directories:
 
 ## Troubleshooting
 
-**Build fails** — Check dependencies (`./build-appimage.sh` lists missing tools), try `./fedora_asahi_build_script.sh` for ARM64, or `./manual_appimage_builder.sh` as fallback.
+**Build fails** — Check dependencies (`./build-appimage.sh` lists missing tools), try `./scripts/builders/fedora_asahi_build_script.sh` for ARM64, or `./scripts/builders/manual_appimage_builder.sh` as fallback.
 
 **AppImage won't start** — Run `chmod +x Claude_Desktop-*.AppImage`. Check FUSE: `ls /dev/fuse && sudo chmod 666 /dev/fuse`.
 
-**Auth issues** — Run `./claude-auth-diagnostics.sh` for a comprehensive check. Verify `~/.config/Claude/` permissions.
+**Auth issues** — Run `./scripts/tools/claude-auth-diagnostics.sh` for a comprehensive check. Verify `~/.config/Claude/` permissions.
 
-**HiDPI scaling** — Auto-detected on Apple Silicon. Override: `./claude-fixed-launcher-v2.sh --scale 2` or set `GDK_SCALE=2`.
+**HiDPI scaling** — Auto-detected on Apple Silicon. Override: `./scripts/launcher/claude-launcher.sh --scale 2` or set `GDK_SCALE=2`.
 
 See `docs/` for detailed documentation.
 
 ## Project Structure
 
 ```
-build-appimage.sh               # Universal builder (auto-detects platform)
-fedora_asahi_build_script.sh    # ARM64-optimized builder
-manual_appimage_builder.sh      # Fallback builder
-claude-fixed-launcher-v2.sh     # Main launcher (auto-update, HiDPI)
-claude-auth-diagnostics.sh      # Auth troubleshooting
-check-official-version.sh       # Version detection (official + GitHub)
-claude-kill.sh / claude-status.sh / cleanup-claude.sh  # Management tools
-add_persistence_simple.sh       # Data persistence setup
-docs/                           # Architecture, code standards, roadmap
+build-appimage.sh                    # Universal builder (entry point)
+scripts/
+  builders/
+    fedora_asahi_build_script.sh     # ARM64-optimized builder
+    manual_appimage_builder.sh       # Fallback builder
+  launcher/
+    claude-launcher.sh               # Main launcher (auto-update, HiDPI)
+    claude-launcher-no-update.sh     # Offline launcher
+    debug-launcher.sh                # Debug launcher
+  tools/
+    claude-auth-diagnostics.sh       # Auth troubleshooting
+    claude-kill.sh                   # Kill instances
+    claude-status.sh                 # Status checker
+    cleanup-claude.sh                # Remove all data
+    add_persistence_simple.sh        # Data persistence setup
+  version/
+    check-official-version.sh        # Version detection (official + GitHub)
+    check_appimage_version.sh        # Inspect AppImage version
+    check_latest_version.sh          # Quick version check
+  legacy/                            # Old/deprecated scripts
+docs/                                # Architecture, code standards, roadmap
 ```
 
 ## Credits

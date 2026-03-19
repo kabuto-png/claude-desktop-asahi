@@ -12,9 +12,9 @@ Use the [bug report template](.github/ISSUE_TEMPLATE/bug_report.md) and include:
 ## Development Setup
 
 ```bash
-git clone https://github.com/user/claude-desktop-to-appimage.git
+git clone https://github.com/kabuto-png/claude-desktop-to-appimage.git
 cd claude-desktop-to-appimage
-chmod +x *.sh
+find . -name '*.sh' -exec chmod +x {} +
 ```
 
 ### Dependencies
@@ -25,13 +25,13 @@ chmod +x *.sh
 ### Testing
 - Build on target architecture: `./build-appimage.sh`
 - Test AppImage launches: `./Claude_Desktop-*.AppImage --no-sandbox`
-- Run ShellCheck: `shellcheck -s bash -S error *.sh`
+- Run ShellCheck: `find . -name '*.sh' -not -path './node_modules/*' | xargs shellcheck -s bash -S error`
 
 ## Pull Requests
 
 1. Fork the repo and create a feature branch
 2. Make your changes
-3. Ensure `shellcheck -s bash -S error *.sh` passes
+3. Ensure ShellCheck passes on all scripts
 4. Test on your target platform
 5. Submit PR using the [PR template](.github/PULL_REQUEST_TEMPLATE.md)
 

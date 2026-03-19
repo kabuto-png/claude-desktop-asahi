@@ -9,34 +9,31 @@ on:
 jobs:
   test-scripts:
     runs-on: ubuntu-latest
-    
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Set up Node.js
       uses: actions/setup-node@v4
       with:
         node-version: '18'
-        
+
     - name: Install dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y unzip wget
-        
+
     - name: Install npm dependencies
       run: npm install
-      
+
     - name: Make scripts executable
-      run: chmod +x *.sh shfile/*.sh
-      
+      run: find . -name '*.sh' -not -path './node_modules/*' -not -path './.claude/*' -exec chmod +x {} +
+
     - name: Test main build script help
       run: ./build-appimage.sh --help
-      
+
     - name: Validate shell scripts
       run: |
-        for script in *.sh shfile/*.sh; do
-          if [ -f "$script" ]; then
-            echo "Checking $script..."
-            bash -n "$script"
-          fi
+        find . -name '*.sh' -not -path './node_modules/*' -not -path './.claude/*' | while read script; do
+          echo "Checking $script..."
+          bash -n "$script"
         done

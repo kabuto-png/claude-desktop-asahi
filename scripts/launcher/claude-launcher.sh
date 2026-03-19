@@ -12,7 +12,7 @@ PID_FILE="$HOME/.cache/claude-desktop.pid"
 UPDATE_CHECK_FILE="$HOME/.cache/claude-desktop-update-check"
 UPDATE_CHECK_INTERVAL=$((30 * 24 * 60 * 60))  # 30 days in seconds
 DISABLE_UPDATE_CHECK=true  # Set to true to disable automatic update checks (useful for local builds)
-VERSION_CHECKER_SCRIPT="$APPIMAGE_DIR/check-official-version.sh"
+VERSION_CHECKER_SCRIPT="$APPIMAGE_DIR/scripts/version/check-official-version.sh"
 
 # Function to find the latest AppImage in the directory
 find_latest_appimage() {
@@ -433,7 +433,7 @@ launch_claude() {
 main() {
     # Handle --diagnose flag
     if [ "${1:-}" = "--diagnose" ]; then
-        local DIAG_SCRIPT="$APPIMAGE_DIR/claude-auth-diagnostics.sh"
+        local DIAG_SCRIPT="$APPIMAGE_DIR/scripts/tools/claude-auth-diagnostics.sh"
         if [ -f "$DIAG_SCRIPT" ]; then
             bash "$DIAG_SCRIPT"
         else

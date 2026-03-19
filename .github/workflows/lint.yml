@@ -8,4 +8,6 @@ jobs:
       - name: Install ShellCheck
         run: sudo apt-get install -y shellcheck
       - name: Run ShellCheck
-        run: shellcheck -s bash -S error *.sh
+        run: |
+          find . -name '*.sh' -not -path './node_modules/*' -not -path './.claude/*' \
+            | xargs shellcheck -s bash -S error

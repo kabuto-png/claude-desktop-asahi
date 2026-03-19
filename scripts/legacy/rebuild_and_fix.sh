@@ -21,7 +21,7 @@ rm -f filesystem*.squashfs
 
 # Run the main build script
 echo "=== Running Main Build Script ==="
-if ./fedora_asahi_build_script.sh; then
+if ./scripts/builders/fedora_asahi_build_script.sh; then
     echo "✅ Main build script completed successfully"
     
     # Check if AppImage was created
@@ -114,7 +114,7 @@ fi
 
 # If main script failed, try manual builder
 echo "=== Running Manual Builder ==="
-if [ -d "build" ] && ./manual_appimage_builder.sh; then
+if [ -d "build" ] && ./scripts/builders/manual_appimage_builder.sh; then
     echo "✅ Manual builder completed successfully"
     
     # Check if AppImage was created
