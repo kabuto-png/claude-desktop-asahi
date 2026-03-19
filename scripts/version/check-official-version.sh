@@ -18,7 +18,7 @@ get_cached_version() {
     local current_time
     current_time=$(date +%s)
 
-    if [ -z "$cache_time" ] || [ $((current_time - cache_time)) -ge $CACHE_TTL ]; then
+    if [ -z "$cache_time" ] || ! [[ $cache_time =~ ^[0-9]+$ ]] || [ $((current_time - cache_time)) -ge $CACHE_TTL ]; then
         return 1
     fi
 
@@ -137,28 +137,15 @@ get_latest_version() {
     return 1
 }
 
-# Get latest download URL (try redirect, fallback to RELEASES nupkg)
+# Get latest download URL for AppImage (GitHub releases only)
+# Note: RELEASES endpoint provides nupkg URLs which are not directly usable as AppImages.
+# Only GitHub has pre-built AppImage assets.
 get_latest_download_url() {
-    # Try GitHub release asset (most reliable for AppImage)
     local url
     url=$(get_github_download_url)
     if [ -n "$url" ]; then
         echo "$url"
         return 0
-    fi
-
-    # Fallback: construct nupkg URL from RELEASES endpoint
-    local releases_content
-    releases_content=$(curl -sf --connect-timeout 5 --max-time 10 "$RELEASES_URL" 2>/dev/null)
-    if [ -n "$releases_content" ]; then
-        local nupkg
-        nupkg=$(echo "$releases_content" | tail -1 | awk '{print $2}')
-        local version
-        version=$(echo "$nupkg" | grep -oP 'AnthropicClaude-\K[0-9]+\.[0-9]+\.[0-9]+')
-        if [ -n "$version" ] && [ -n "$nupkg" ]; then
-            echo "https://downloads.claude.ai/releases/win32/arm64/${version}/${nupkg}"
-            return 0
-        fi
     fi
 
     return 1

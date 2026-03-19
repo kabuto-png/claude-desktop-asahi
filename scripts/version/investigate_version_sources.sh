@@ -5,13 +5,16 @@
 echo "=== Investigating Claude Desktop Version Sources ==="
 echo ""
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
 # Check if we have a build directory
-if [ ! -d build ]; then
-    echo "No build directory found. Run ./build-appimage.sh first."
+if [ ! -d "$PROJECT_DIR/build" ]; then
+    echo "No build directory found. Run $PROJECT_DIR/build-appimage.sh first."
     exit 1
 fi
 
-cd build
+cd "$PROJECT_DIR/build"
 
 echo "1. Version from .nupkg filename:"
 NUPKG=$(find . -name "AnthropicClaude-*.nupkg" -print -quit 2>/dev/null)

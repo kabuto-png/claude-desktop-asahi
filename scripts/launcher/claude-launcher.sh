@@ -38,9 +38,9 @@ trap 'cleanup_on_exit' EXIT INT TERM
 # Cleanup function for script exit
 cleanup_on_exit() {
     log_info "Script interrupted - cleaning up..."
-    # Don't kill Claude Desktop when launcher script exits normally
-    # Only cleanup temp files
     rm -f "$LOCK_FILE" 2>/dev/null || true
+    # Clean up partial downloads
+    rm -f /tmp/Claude_Desktop-*.AppImage.tmp 2>/dev/null || true
 }
 
 # Colors for output
@@ -362,19 +362,21 @@ check_and_update_appimage() {
         local TEMP_APPIMAGE="/tmp/Claude_Desktop-${LATEST_VERSION}-aarch64.AppImage.tmp"
 
         if curl -L -f --progress-bar -o "$TEMP_APPIMAGE" "$DOWNLOAD_URL" 2>/dev/null; then
-            # Verify download: file must be > 1MB (sanity check for AppImage)
+            # Verify download: file must be > 50MB (AppImages are typically 80-150MB)
             local FILE_SIZE
             FILE_SIZE=$(stat -c%s "$TEMP_APPIMAGE" 2>/dev/null || echo "0")
-            if [ "$FILE_SIZE" -lt 1048576 ]; then
-                log_error "Downloaded file too small (${FILE_SIZE} bytes). Discarding."
+            if [ "$FILE_SIZE" -lt 52428800 ]; then
+                log_error "Downloaded file too small (${FILE_SIZE} bytes, expected >50MB). Discarding."
                 rm -f "$TEMP_APPIMAGE" 2>/dev/null
                 return 0
             fi
 
-            # Atomic move: temp -> final
+            # Move to final location (cp+rm fallback for cross-device)
             log_info "Download complete. Installing..."
             mkdir -p "$APPIMAGE_DIR"
-            mv "$TEMP_APPIMAGE" "$NEW_APPIMAGE_PATH"
+            if ! mv "$TEMP_APPIMAGE" "$NEW_APPIMAGE_PATH" 2>/dev/null; then
+                cp "$TEMP_APPIMAGE" "$NEW_APPIMAGE_PATH" && rm -f "$TEMP_APPIMAGE"
+            fi
             chmod +x "$NEW_APPIMAGE_PATH"
             log_info "Updated to v$LATEST_VERSION"
 
@@ -397,7 +399,8 @@ launch_claude() {
     PID_FILE="$HOME/.cache/claude-desktop.pid"
     if [ -f "$PID_FILE" ]; then
         OLD_PID=$(cat "$PID_FILE")
-        if kill -0 "$OLD_PID" 2>/dev/null; then
+        # Verify PID belongs to Claude before killing (avoid PID reuse race)
+        if kill -0 "$OLD_PID" 2>/dev/null && grep -q "Claude\|electron" /proc/"$OLD_PID"/cmdline 2>/dev/null; then
             log_warn "Claude Desktop already running with PID: $OLD_PID"
             log_info "Killing existing instance..."
             kill -TERM "$OLD_PID" 2>/dev/null || kill -KILL "$OLD_PID" 2>/dev/null || true

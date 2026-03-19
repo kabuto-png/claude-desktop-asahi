@@ -21,7 +21,7 @@ echo "Distribution: $(grep PRETTY_NAME /etc/os-release | cut -d'"' -f2)"
 
 # Configuration
 ELECTRON_BUNDLED=1  # Always bundle on Asahi for compatibility
-CLAUDE_DOWNLOAD_URL="https://downloads.claude.ai/releases/win32/arm64/1.0.1307/Claude-1ed8835ce5539ba2a894ab752752be672a17c0d8.exe"
+CLAUDE_DOWNLOAD_URL="${CLAUDE_DOWNLOAD_URL:-}"  # Auto-detected by build-appimage.sh or pass via --claude-download-url
 APP_IMAGE_TOOL="/usr/local/bin/appimagetool"
 
 # Parse command line arguments

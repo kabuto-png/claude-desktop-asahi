@@ -2,11 +2,14 @@
 # SPDX-License-Identifier: Apache-2.0
 # Check if there's a newer Claude Desktop version available
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
 echo "=== Claude Desktop Version Checker ==="
 echo ""
 
 # Your current version
-CURRENT_VERSION=$(ls Claude_Desktop-*.AppImage 2>/dev/null | grep -oP 'Claude_Desktop-\K[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+CURRENT_VERSION=$(ls "$PROJECT_DIR"/Claude_Desktop-*.AppImage 2>/dev/null | grep -oP 'Claude_Desktop-\K[0-9]+(\.[0-9]+)+' | head -1)
 if [ -n "$CURRENT_VERSION" ]; then
     echo "Your version: $CURRENT_VERSION"
 else
@@ -27,14 +30,14 @@ if command -v curl &>/dev/null; then
         if [ "$CURRENT_VERSION" = "$LATEST" ]; then
             echo "✅ You have the latest version!"
         elif [ -z "$CURRENT_VERSION" ]; then
-            echo "ℹ️  Run ./build-appimage.sh to build version $LATEST"
+            echo "ℹ️  Run $PROJECT_DIR/build-appimage.sh to build version $LATEST"
         else
             echo "⚠️  Newer version available: $LATEST (you have $CURRENT_VERSION)"
             echo ""
             echo "To update:"
             echo "  1. Check https://github.com/aaddrick/claude-desktop-debian/releases"
             echo "  2. Find the ARM64 download URL for version $LATEST"
-            echo "  3. Run: ./build-appimage.sh --claude-download-url <new-url>"
+            echo "  3. Run: $PROJECT_DIR/build-appimage.sh --claude-download-url <new-url>"
         fi
     else
         echo "❌ Could not check latest version (API rate limit or network issue)"
