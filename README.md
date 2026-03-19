@@ -10,19 +10,21 @@ Build and run [Claude Desktop](https://claude.ai/download) on Linux as a portabl
 
 ## Quick Start
 
+### Install from Release (recommended)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/kabuto-png/claude-desktop-to-appimage/main/install.sh | bash
+```
+
+Downloads the latest AppImage, verifies checksum, installs to `~/.local/bin/`, and creates a desktop entry.
+
+### Build from Source
+
 ```bash
 git clone https://github.com/kabuto-png/claude-desktop-to-appimage.git
 cd claude-desktop-to-appimage
-
-# Build (auto-detects architecture and latest version)
 ./build-appimage.sh
-
-# Run
 ./Claude_Desktop-*-aarch64.AppImage
-
-# Optional: add data persistence
-./scripts/tools/add_persistence_simple.sh
-./Claude_Desktop-*-aarch64-persistent.AppImage
 ```
 
 ## How It Works
