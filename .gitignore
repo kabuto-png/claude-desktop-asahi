@@ -45,4 +45,9 @@ Thumbs.db
 .cache/
 .npm/
 .eslintcache
-.claude
+
+# Internal tooling (never commit)
+.claude/
+plans/
+docs/
+CLAUDE.md
