@@ -1,10 +1,12 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 
 # Claude Desktop Launcher (No Auto-Update)
 # Launches the Claude Desktop AppImage without checking for updates.
 
 # Configuration
-APPIMAGE_PATH="/home/longne/Documents/GitHub/claude-desktop-to-appimage/Claude_Desktop-0.9.3-aarch64-persistent.AppImage"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+APPIMAGE_PATH=$(/usr/bin/find "$SCRIPT_DIR" -maxdepth 1 -name "Claude_Desktop-*-aarch64*.AppImage" -type f 2>/dev/null | sort -V | tail -n 1)
 LOCK_FILE="/tmp/claude-desktop.lock"
 PID_FILE="$HOME/.cache/claude-desktop.pid"
 

@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 # Fixed Claude Desktop Launcher for Fedora Asahi - Version 2
 # Addresses multiple mount issues and ARM64 graphics problems
 

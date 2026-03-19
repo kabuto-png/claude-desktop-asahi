@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 
 # Debug version of Claude Desktop Launcher
 echo "DEBUG: Script started"
@@ -7,7 +8,8 @@ echo "DEBUG: Script path: $0"
 echo "DEBUG: Arguments: $@"
 
 # Configuration
-APPIMAGE_PATH="/home/longne/Documents/GitHub/claude-desktop-to-appimage/Claude_Desktop-0.9.3-aarch64-persistent.AppImage"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+APPIMAGE_PATH=$(/usr/bin/find "$SCRIPT_DIR" -maxdepth 1 -name "Claude_Desktop-*-aarch64*.AppImage" -type f 2>/dev/null | sort -V | tail -n 1)
 
 # Colors for output
 RED='\033[0;31m'
