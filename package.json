@@ -1,0 +1,9 @@
+{
+  "name": "claude-desktop-appimage",
+  "version": "1.0.0",
+  "private": true,
+  "devDependencies": {
+    "@electron/asar": "^4.1.0",
+    "electron": "^41.0.3"
+  }
+}
