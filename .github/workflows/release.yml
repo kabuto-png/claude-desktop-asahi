@@ -290,17 +290,35 @@ jobs:
           X-AppImage-Version=${VERSION}
           DESKTOP
 
-          # Extract icon from installer or use placeholder
+          # Extract icon — try .ico from installer, fallback to generated PNG
           ICON_SRC=$(find extracted/ nupkg_contents/ -name "*.ico" -print -quit 2>/dev/null || true)
           if [ -n "$ICON_SRC" ]; then
-            # Convert .ico to .png
-            wrestool -x -t 14 "$ICON_SRC" 2>/dev/null | convert ico:- -resize 256x256 "$APP_DIR/claude-desktop.png" 2>/dev/null || \
-            convert "$ICON_SRC" -resize 256x256 "$APP_DIR/claude-desktop.png" 2>/dev/null || \
-            convert -size 256x256 xc:purple -fill white -gravity center -pointsize 72 -annotate 0 "C" "$APP_DIR/claude-desktop.png"
-          else
-            # Fallback: generate simple icon
-            convert -size 256x256 xc:'#d4a574' -fill white -gravity center -pointsize 100 -annotate 0 "C" "$APP_DIR/claude-desktop.png"
+            wrestool -x -t 14 "$ICON_SRC" 2>/dev/null | magick ico:- -resize 256x256 "$APP_DIR/claude-desktop.png" 2>/dev/null || \
+            magick "$ICON_SRC" -resize 256x256 "$APP_DIR/claude-desktop.png" 2>/dev/null || true
           fi
+
+          # Guarantee icon exists (generate if extraction failed)
+          if [ ! -f "$APP_DIR/claude-desktop.png" ]; then
+            magick -size 256x256 xc:'#d4a574' -fill white -gravity center -pointsize 100 -annotate 0 "C" "$APP_DIR/claude-desktop.png" 2>/dev/null || \
+            convert -size 256x256 xc:'#d4a574' -fill white -gravity center -pointsize 100 -annotate 0 "C" "$APP_DIR/claude-desktop.png" 2>/dev/null || \
+            python3 -c "
+          import struct, zlib
+          # Generate minimal 256x256 PNG with solid color
+          w, h = 256, 256
+          def chunk(ctype, data):
+              c = ctype + data
+              return struct.pack('>I', len(data)) + c + struct.pack('>I', zlib.crc32(c) & 0xffffffff)
+          raw = b''
+          for y in range(h):
+              raw += b'\x00' + b'\xd4\xa5\x74' * w
+          with open('$APP_DIR/claude-desktop.png', 'wb') as f:
+              f.write(b'\x89PNG\r\n\x1a\n')
+              f.write(chunk(b'IHDR', struct.pack('>IIBBBBB', w, h, 8, 2, 0, 0, 0)))
+              f.write(chunk(b'IDAT', zlib.compress(raw)))
+              f.write(chunk(b'IEND', b''))
+          "
+          fi
+
           cp "$APP_DIR/claude-desktop.png" "$APP_DIR/usr/share/icons/hicolor/256x256/apps/"
           cp "$APP_DIR/claude-desktop.png" "$APP_DIR/.DirIcon"
 
