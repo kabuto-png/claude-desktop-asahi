@@ -103,21 +103,15 @@ jobs:
             NUPKG=$(echo "$RELEASES" | tail -1 | awk '{print $2}')
             echo "Found nupkg: $NUPKG (SHA1: $EXPECTED_SHA)"
 
-            # Download nupkg directly (contains the app.asar we need)
-            NUPKG_URL="https://downloads.claude.ai/releases/win32/arm64/${VERSION}/${NUPKG}"
+            # Download nupkg directly (no version prefix in URL)
+            NUPKG_URL="https://downloads.claude.ai/releases/win32/arm64/${NUPKG}"
             echo "Downloading from: $NUPKG_URL"
+            curl -L -f --progress-bar -o "build/${NUPKG}" "$NUPKG_URL"
 
-            if curl -L -f --progress-bar -o "build/${NUPKG}" "$NUPKG_URL"; then
-              echo "Downloaded nupkg successfully"
-            else
-              echo "Direct nupkg download failed, trying without version prefix..."
-              NUPKG_URL2="https://downloads.claude.ai/releases/win32/arm64/${NUPKG}"
-              curl -L -f --progress-bar -o "build/${NUPKG}" "$NUPKG_URL2"
-            fi
-
-            # Verify SHA1 checksum from RELEASES
+            # Verify SHA1 checksum (case-insensitive comparison)
             if [ -n "$EXPECTED_SHA" ]; then
-              ACTUAL_SHA=$(sha1sum "build/${NUPKG}" | awk '{print $1}')
+              ACTUAL_SHA=$(sha1sum "build/${NUPKG}" | awk '{print toupper($1)}')
+              EXPECTED_SHA=$(echo "$EXPECTED_SHA" | tr '[:lower:]' '[:upper:]')
               if [ "$EXPECTED_SHA" != "$ACTUAL_SHA" ]; then
                 echo "::error::Checksum mismatch! Expected: $EXPECTED_SHA Got: $ACTUAL_SHA"
                 exit 1
@@ -367,13 +361,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.check-version.outputs.version }}
         run: |
+          # Debug: show artifact structure
+          echo "Artifact directory contents:"
+          find artifacts/ -type f 2>/dev/null || true
+
+          # Find AppImage files (handle both nested and flat layouts)
           ASSETS=()
-          for f in artifacts/appimage-*/*.AppImage; do
-            if [ -f "$f" ]; then
-              ASSETS+=("$f")
-              echo "Release asset: $(basename "$f") ($(stat -c%s "$f" | numfmt --to=iec))"
-            fi
-          done
+          while IFS= read -r f; do
+            ASSETS+=("$f")
+            echo "Release asset: $(basename "$f") ($(stat -c%s "$f" | numfmt --to=iec))"
+          done < <(find artifacts/ -name "*.AppImage" -type f 2>/dev/null)
 
           if [ ${#ASSETS[@]} -eq 0 ]; then
             echo "::error::No AppImage artifacts found"
@@ -383,7 +380,7 @@ jobs:
           # Generate SHA256 checksums
           CHECKSUM_FILE="SHA256SUMS.txt"
           for f in "${ASSETS[@]}"; do
-            sha256sum "$f" | sed 's|artifacts/appimage-[^/]*/||' >> "$CHECKSUM_FILE"
+            sha256sum "$f" | sed 's|.*/||' | sed 's|  .*|  '"$(basename "$f")"'|' >> "$CHECKSUM_FILE"
           done
           ASSETS+=("$CHECKSUM_FILE")
 
