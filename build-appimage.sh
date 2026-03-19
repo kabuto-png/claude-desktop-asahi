@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 set -e
 
 # Claude Desktop AppImage Builder
@@ -9,7 +10,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Configuration defaults
 APPIMAGETOOL_PATH="/usr/local/bin/appimagetool"
 BUNDLE_ELECTRON=0
-CLAUDE_DOWNLOAD_URL="https://downloads.claude.ai/releases/win32/arm64/1.0.1307/Claude-1ed8835ce5539ba2a894ab752752be672a17c0d8.exe"
+CLAUDE_DOWNLOAD_URL=""
 ARCH=$(uname -m)
 
 # Colors for output
@@ -43,7 +44,7 @@ Usage: $0 [OPTIONS]
 Options:
   --appimagetool <path>         Path to appimagetool (default: $APPIMAGETOOL_PATH)
   --bundle-electron             Bundle Electron with the AppImage (default: $BUNDLE_ELECTRON)
-  --claude-download-url <url>   URL to download Claude installer (default: $CLAUDE_DOWNLOAD_URL)
+  --claude-download-url <url>   URL to download Claude installer (default: auto-detect)
   -h, --help                   Show this help message
 
 Examples:
@@ -155,6 +156,23 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# Auto-detect download URL if not provided
+auto_detect_download_url() {
+    local version_script="$SCRIPT_DIR/check-official-version.sh"
+    if [ -f "$version_script" ]; then
+        source "$version_script"
+        local url
+        url=$(get_latest_download_url)
+        if [ -n "$url" ]; then
+            echo "$url"
+            return 0
+        fi
+    fi
+    log_error "Could not auto-detect Claude download URL."
+    log_error "Please provide it manually: $0 --claude-download-url <url>"
+    return 1
+}
+
 # Main execution
 log_info "Claude Desktop AppImage Builder"
 log_info "Architecture: $ARCH"
@@ -171,6 +189,13 @@ if [ -f "$SCRIPT_DIR/package.json" ] && [ ! -d "$SCRIPT_DIR/node_modules" ]; the
     log_success "npm dependencies installed"
 fi
 
+# Auto-detect download URL if not provided
+if [ -z "$CLAUDE_DOWNLOAD_URL" ]; then
+    log_info "No download URL provided, auto-detecting..."
+    CLAUDE_DOWNLOAD_URL=$(auto_detect_download_url) || exit 1
+    log_success "Detected download URL: $CLAUDE_DOWNLOAD_URL"
+fi
+
 # Detect and run the appropriate build script
 BUILD_SCRIPT=$(detect_build_script)
 log_info "Using build script: $BUILD_SCRIPT"
@@ -180,7 +205,7 @@ BUILD_ARGS=()
 if [ "$BUNDLE_ELECTRON" = "1" ]; then
     BUILD_ARGS+=("--bundle-electron")
 fi
-if [ "$CLAUDE_DOWNLOAD_URL" != "https://claude.ai/download" ]; then
+if [ -n "$CLAUDE_DOWNLOAD_URL" ]; then
     BUILD_ARGS+=("--claude-download-url" "$CLAUDE_DOWNLOAD_URL")
 fi
 if [ "$APPIMAGETOOL_PATH" != "/usr/local/bin/appimagetool" ]; then

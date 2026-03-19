@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 # Check official Anthropic downloads for latest Claude Desktop version
 # Uses the Squirrel/Electron RELEASES endpoint (no Cloudflare protection)
 
@@ -131,6 +132,33 @@ get_latest_version() {
         save_to_cache "$version"
         echo "$version"
         return 0
+    fi
+
+    return 1
+}
+
+# Get latest download URL (try redirect, fallback to RELEASES nupkg)
+get_latest_download_url() {
+    # Try GitHub release asset (most reliable for AppImage)
+    local url
+    url=$(get_github_download_url)
+    if [ -n "$url" ]; then
+        echo "$url"
+        return 0
+    fi
+
+    # Fallback: construct nupkg URL from RELEASES endpoint
+    local releases_content
+    releases_content=$(curl -sf --connect-timeout 5 --max-time 10 "$RELEASES_URL" 2>/dev/null)
+    if [ -n "$releases_content" ]; then
+        local nupkg
+        nupkg=$(echo "$releases_content" | tail -1 | awk '{print $2}')
+        local version
+        version=$(echo "$nupkg" | grep -oP 'AnthropicClaude-\K[0-9]+\.[0-9]+\.[0-9]+')
+        if [ -n "$version" ] && [ -n "$nupkg" ]; then
+            echo "https://downloads.claude.ai/releases/win32/arm64/${version}/${nupkg}"
+            return 0
+        fi
     fi
 
     return 1
