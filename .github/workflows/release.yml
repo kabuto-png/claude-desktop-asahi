@@ -345,7 +345,7 @@ jobs:
           echo "Size: $(numfmt --to=iec $FILE_SIZE)"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: appimage-aarch64
           path: Claude_Desktop-*-aarch64.AppImage
