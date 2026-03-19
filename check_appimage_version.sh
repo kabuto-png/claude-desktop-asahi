@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 # Quick script to check the actual version inside an AppImage
 
 if [ -z "$1" ]; then

@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 # Investigate all possible version sources in Claude Desktop installer
 
 echo "=== Investigating Claude Desktop Version Sources ==="

@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 # Check if there's a newer Claude Desktop version available
 
 echo "=== Claude Desktop Version Checker ==="

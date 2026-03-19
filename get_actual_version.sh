@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 # Get the actual Claude Desktop version from app.asar package.json
 # This is the most reliable source of truth for the version
 

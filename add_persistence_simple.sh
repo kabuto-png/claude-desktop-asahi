@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 set -e
 
 echo "=== Adding Data Persistence to Claude AppImage ==="

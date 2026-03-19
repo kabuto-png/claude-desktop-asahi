@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 # Claude Desktop Authentication Diagnostics
 # Checks auth config, permissions, token cache, and network connectivity
 

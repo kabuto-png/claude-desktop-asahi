@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 set -e
 
 echo "=== Manual AppImage Builder for ARM64 ==="

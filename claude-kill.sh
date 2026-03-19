@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 
 # Claude Desktop Kill Script
 # Safely terminates Claude Desktop and cleans up all related processes

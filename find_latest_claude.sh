@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 # Script to help find the latest Claude Desktop download URLs
 
 echo "=== Claude Desktop Version Finder ==="

@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 # Quick cleanup script for Claude Desktop mount issues
 
 echo "=== Claude Desktop Cleanup ==="
