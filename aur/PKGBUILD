@@ -1,0 +1,36 @@
+# Maintainer: kabuto-png <https://github.com/kabuto-png>
+# SPDX-License-Identifier: Apache-2.0
+pkgname=claude-desktop-appimage
+pkgver=1.1.7464
+pkgrel=1
+pkgdesc="Claude Desktop for Linux (AppImage, aarch64)"
+arch=('aarch64')
+url="https://github.com/kabuto-png/claude-desktop-asahi"
+license=('Apache-2.0')
+depends=('fuse2' 'hicolor-icon-theme')
+optdepends=('libnotify: desktop notifications')
+source=("${pkgname}-${pkgver}.AppImage::${url}/releases/download/v${pkgver}/Claude_Desktop-${pkgver}-aarch64.AppImage")
+sha256sums=('SKIP')
+options=('!strip')
+
+package() {
+  install -Dm755 "${srcdir}/${pkgname}-${pkgver}.AppImage" \
+    "${pkgdir}/opt/${pkgname}/claude-desktop.AppImage"
+
+  # Desktop entry
+  install -dm755 "${pkgdir}/usr/share/applications"
+  cat > "${pkgdir}/usr/share/applications/claude-desktop.desktop" << EOF
+[Desktop Entry]
+Name=Claude Desktop
+Comment=Claude AI Assistant
+Exec=/opt/${pkgname}/claude-desktop.AppImage --no-sandbox %u
+Icon=claude-desktop
+Type=Application
+Categories=Network;Chat;
+StartupWMClass=Claude
+EOF
+
+  # Launcher symlink
+  install -dm755 "${pkgdir}/usr/bin"
+  ln -s "/opt/${pkgname}/claude-desktop.AppImage" "${pkgdir}/usr/bin/claude-desktop"
+}
