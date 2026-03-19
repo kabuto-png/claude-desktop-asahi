@@ -98,8 +98,10 @@ jobs:
               exit 1
             fi
 
+            # RELEASES format: SHA1 FILENAME SIZE
+            EXPECTED_SHA=$(echo "$RELEASES" | tail -1 | awk '{print $1}')
             NUPKG=$(echo "$RELEASES" | tail -1 | awk '{print $2}')
-            echo "Found nupkg: $NUPKG"
+            echo "Found nupkg: $NUPKG (SHA1: $EXPECTED_SHA)"
 
             # Download nupkg directly (contains the app.asar we need)
             NUPKG_URL="https://downloads.claude.ai/releases/win32/arm64/${VERSION}/${NUPKG}"
@@ -108,10 +110,19 @@ jobs:
             if curl -L -f --progress-bar -o "build/${NUPKG}" "$NUPKG_URL"; then
               echo "Downloaded nupkg successfully"
             else
-              echo "Direct nupkg download failed, trying full URL construction..."
-              # Try without version prefix (some CDN layouts differ)
+              echo "Direct nupkg download failed, trying without version prefix..."
               NUPKG_URL2="https://downloads.claude.ai/releases/win32/arm64/${NUPKG}"
               curl -L -f --progress-bar -o "build/${NUPKG}" "$NUPKG_URL2"
+            fi
+
+            # Verify SHA1 checksum from RELEASES
+            if [ -n "$EXPECTED_SHA" ]; then
+              ACTUAL_SHA=$(sha1sum "build/${NUPKG}" | awk '{print $1}')
+              if [ "$EXPECTED_SHA" != "$ACTUAL_SHA" ]; then
+                echo "::error::Checksum mismatch! Expected: $EXPECTED_SHA Got: $ACTUAL_SHA"
+                exit 1
+              fi
+              echo "Checksum verified: $ACTUAL_SHA"
             fi
           fi
 

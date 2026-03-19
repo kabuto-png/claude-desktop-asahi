@@ -18,6 +18,18 @@ curl -fsSL https://raw.githubusercontent.com/kabuto-png/claude-desktop-to-appima
 
 Downloads the latest AppImage, verifies checksum, installs to `~/.local/bin/`, and creates a desktop entry.
 
+### Arch Linux (AUR)
+
+```bash
+# Using yay
+yay -S claude-desktop-appimage
+
+# Or manually
+git clone https://github.com/kabuto-png/claude-desktop-to-appimage.git
+cd claude-desktop-to-appimage/aur
+makepkg -si
+```
+
 ### Build from Source
 
 ```bash

@@ -37,3 +37,23 @@ jobs:
           echo "Checking $script..."
           bash -n "$script"
         done
+
+    - name: Smoke test - version detection
+      run: |
+        source scripts/version/check-official-version.sh
+        VERSION=$(get_latest_version)
+        if [ -z "$VERSION" ]; then
+          echo "::warning::Could not detect Claude version (network issue?)"
+        else
+          echo "Detected Claude Desktop version: $VERSION"
+        fi
+
+    - name: Smoke test - install script dry check
+      run: |
+        # Verify install.sh is syntactically valid
+        bash -n install.sh
+        # Check it detects non-aarch64 correctly
+        if [ "$(uname -m)" != "aarch64" ]; then
+          install_output=$(bash install.sh 2>&1 || true)
+          echo "$install_output" | grep -q "aarch64" && echo "Arch check works"
+        fi
