@@ -1,4 +1,5 @@
 #!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
 set -e
 
 # Fedora Asahi specific build script for Claude Desktop AppImage
@@ -298,6 +299,30 @@ EOFSTUB
 mkdir -p app.asar.contents/resources/i18n
 cp ../lib/net45/resources/Tray* app.asar.contents/resources/
 cp ../lib/net45/resources/*-*.json app.asar.contents/resources/i18n/
+
+# ===== CRITICAL PATCHES FOR CLAUDE CODE SUPPORT =====
+echo "=== Applying Claude Code patches ==="
+
+# Patch 1: Fix window frame/titlebar for Linux
+echo "Patching window decorations..."
+sed -i 's/titleBarStyle:"hidden"/titleBarStyle:"default"/g' app.asar.contents/.vite/build/index.js
+sed -i 's/titleBarStyle:"hiddenInset"/titleBarStyle:"default"/g' app.asar.contents/.vite/build/index.js
+
+# Patch 2: Fix Claude Code platform detection for Linux (CRITICAL!)
+# This is the most important patch - without it, Claude Code won't work
+echo "Patching Claude Code platform detection..."
+sed -i 's/if(process\.platform==="darwin")return e==="arm64"?"darwin-arm64":"darwin-x64";if(process\.platform==="win32")return"win32-x64";throw new Error/if(process.platform==="darwin")return e==="arm64"?"darwin-arm64":"darwin-x64";if(process.platform==="win32")return"win32-x64";if(process.platform==="linux")return e==="arm64"?"linux-arm64":"linux-x64";throw new Error/g' app.asar.contents/.vite/build/index.js
+
+# Patch 3: Fix origin validation for file:// URLs
+echo "Patching origin validation..."
+sed -i 's/e\.protocol==="file:"&&oe\.app\.isPackaged===!0/e.protocol==="file:"/g' app.asar.contents/.vite/build/index.js
+
+# Patch 4: Add stub handlers for ClaudeVM
+echo "Patching ClaudeVM handlers..."
+sed -i 's/t\.ipc\.handle("\$eipc_message\$_6a039d75-594a-4e0d-aad1-af47761a02ae_\$_claude\.web_\$_ClaudeCode_\$_getStatus"/t.ipc.handle("\$eipc_message\$_6a039d75-594a-4e0d-aad1-af47761a02ae_\$_claude.web_\$_ClaudeVM_\$_getDownloadStatus",async()=>null),t.ipc.handle("\$eipc_message\$_6a039d75-594a-4e0d-aad1-af47761a02ae_\$_claude.web_\$_ClaudeVM_\$_getRunningStatus",async()=>null),t.ipc.handle("\$eipc_message\$_6a039d75-594a-4e0d-aad1-af47761a02ae_\$_claude.web_\$_ClaudeCode_\$_getStatus"/g' app.asar.contents/.vite/build/index.js
+
+echo "✓ Claude Code patches applied successfully"
+# ===== END PATCHES =====
 
 # Repackage
 asar pack app.asar.contents app.asar
