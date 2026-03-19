@@ -162,6 +162,12 @@ jobs:
           echo "Found app.asar: $ASAR"
           cp "$ASAR" app.asar
 
+          # Create dummy unpacked native module (Windows .node not needed on Linux)
+          mkdir -p app.asar.unpacked/node_modules/@anthropic-ai/claude-native/
+          mkdir -p app.asar.unpacked/node_modules/@ant/claude-native/
+          touch app.asar.unpacked/node_modules/@anthropic-ai/claude-native/claude-native-binding.node
+          touch app.asar.unpacked/node_modules/@ant/claude-native/claude-native-binding.node
+
           # Extract asar for patching
           asar extract app.asar app_source/
           echo "Extracted app.asar successfully"
