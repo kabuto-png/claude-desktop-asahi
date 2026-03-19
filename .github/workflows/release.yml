@@ -1,0 +1,206 @@
+name: Build & Release AppImage
+
+on:
+  # Check for new versions daily at 06:00 UTC
+  schedule:
+    - cron: '0 6 * * *'
+  # Manual trigger with optional version override
+  workflow_dispatch:
+    inputs:
+      force_build:
+        description: 'Force build even if version unchanged'
+        type: boolean
+        default: false
+      claude_download_url:
+        description: 'Override Claude download URL (leave empty for auto-detect)'
+        type: string
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      should_build: ${{ steps.check.outputs.should_build }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get latest Claude Desktop version
+        id: version
+        run: |
+          # Query Anthropic RELEASES endpoint
+          RELEASES_URL="https://downloads.claude.ai/releases/win32/arm64/RELEASES"
+          VERSION=$(curl -sf --connect-timeout 10 --max-time 20 "$RELEASES_URL" 2>/dev/null \
+            | tail -1 | grep -oP 'AnthropicClaude-\K[0-9]+\.[0-9]+\.[0-9]+' || true)
+
+          if [ -z "$VERSION" ]; then
+            echo "::error::Could not detect Claude Desktop version"
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Detected version: $VERSION"
+
+      - name: Check if release already exists
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          FORCE="${{ inputs.force_build }}"
+
+          if [ "$FORCE" = "true" ]; then
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+            echo "Force build requested"
+            exit 0
+          fi
+
+          # Check if a release with this version tag already exists
+          if gh release view "v${VERSION}" &>/dev/null; then
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
+            echo "Release v${VERSION} already exists, skipping"
+          else
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+            echo "New version v${VERSION} detected, will build"
+          fi
+
+  build:
+    needs: check-version
+    if: needs.check-version.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [x86_64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nodejs npm p7zip-full wget curl jq \
+            squashfs-tools imagemagick icoutils libfuse2
+
+      - name: Install appimagetool
+        run: |
+          wget -q -O /usr/local/bin/appimagetool \
+            "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
+          chmod +x /usr/local/bin/appimagetool
+
+      - name: Install asar
+        run: npm install -g @electron/asar
+
+      - name: Build AppImage
+        env:
+          VERSION: ${{ needs.check-version.outputs.version }}
+          CLAUDE_URL_OVERRIDE: ${{ inputs.claude_download_url }}
+        run: |
+          BUILD_ARGS=()
+          if [ -n "$CLAUDE_URL_OVERRIDE" ]; then
+            BUILD_ARGS+=("--claude-download-url" "$CLAUDE_URL_OVERRIDE")
+          fi
+          BUILD_ARGS+=("--bundle-electron")
+
+          chmod +x build-appimage.sh manual_appimage_builder.sh
+          ./build-appimage.sh "${BUILD_ARGS[@]}"
+
+      - name: Verify AppImage
+        run: |
+          APPIMAGE=$(ls Claude_Desktop-*-*.AppImage 2>/dev/null | head -1)
+          if [ -z "$APPIMAGE" ]; then
+            echo "::error::No AppImage found after build"
+            exit 1
+          fi
+
+          FILE_SIZE=$(stat -c%s "$APPIMAGE")
+          if [ "$FILE_SIZE" -lt 1048576 ]; then
+            echo "::error::AppImage too small (${FILE_SIZE} bytes)"
+            exit 1
+          fi
+
+          echo "Built: $APPIMAGE ($(numfmt --to=iec $FILE_SIZE))"
+          echo "APPIMAGE_NAME=$APPIMAGE" >> "$GITHUB_ENV"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: appimage-${{ matrix.arch }}
+          path: Claude_Desktop-*-*.AppImage
+          retention-days: 1
+
+  release:
+    needs: [check-version, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.check-version.outputs.version }}
+        run: |
+          # Collect all AppImage files
+          ASSETS=()
+          for f in artifacts/appimage-*/*.AppImage; do
+            if [ -f "$f" ]; then
+              ASSETS+=("$f")
+              echo "Release asset: $f ($(stat -c%s "$f" | numfmt --to=iec))"
+            fi
+          done
+
+          if [ ${#ASSETS[@]} -eq 0 ]; then
+            echo "::error::No AppImage artifacts found"
+            exit 1
+          fi
+
+          # Generate SHA256 checksums
+          CHECKSUM_FILE="SHA256SUMS.txt"
+          for f in "${ASSETS[@]}"; do
+            sha256sum "$f" | sed 's|artifacts/appimage-[^/]*/||' >> "$CHECKSUM_FILE"
+          done
+          ASSETS+=("$CHECKSUM_FILE")
+
+          # Create release
+          gh release create "v${VERSION}" \
+            --title "Claude Desktop v${VERSION}" \
+            --notes "$(cat <<EOF
+          ## Claude Desktop v${VERSION} AppImage
+
+          Automated build of Claude Desktop as a Linux AppImage.
+
+          ### Installation
+
+          \`\`\`bash
+          chmod +x Claude_Desktop-${VERSION}-*.AppImage
+          ./Claude_Desktop-${VERSION}-*.AppImage
+          \`\`\`
+
+          ### Verify download
+
+          \`\`\`bash
+          sha256sum -c SHA256SUMS.txt
+          \`\`\`
+
+          ### Data persistence
+
+          Your data is stored in XDG directories:
+          - Config: \`~/.config/Claude/\`
+          - Data: \`~/.local/share/Claude/\`
+          - Cache: \`~/.cache/Claude/\`
+
+          See [README](https://github.com/${{ github.repository }}) for full documentation.
+
+          ---
+          *Built automatically from Claude Desktop Windows installer.*
+          EOF
+          )" \
+            "${ASSETS[@]}"
+
+          echo "Released v${VERSION}"
