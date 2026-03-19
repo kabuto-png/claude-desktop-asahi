@@ -22,8 +22,8 @@ echo ""
 "$APPIMAGE" --appimage-extract usr/share/applications/*.desktop 2>/dev/null || \
 "$APPIMAGE" --appimage-extract *.desktop 2>/dev/null
 
-if [ -f squashfs-root/*.desktop ] || [ -f squashfs-root/usr/share/applications/*.desktop ]; then
-    DESKTOP_FILE=$(find squashfs-root -name "*.desktop" -print -quit)
+DESKTOP_FILE=$(find squashfs-root -name "*.desktop" -print -quit 2>/dev/null)
+if [ -n "$DESKTOP_FILE" ]; then
     echo "Version from desktop file:"
     grep -E "(X-AppImage-Version|Version)=" "$DESKTOP_FILE" || echo "  (not found)"
     echo ""

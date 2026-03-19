@@ -5,7 +5,7 @@
 echo "DEBUG: Script started"
 echo "DEBUG: Current directory: $(pwd)"
 echo "DEBUG: Script path: $0"
-echo "DEBUG: Arguments: $@"
+echo "DEBUG: Arguments: $*"
 
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

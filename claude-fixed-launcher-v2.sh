@@ -328,42 +328,11 @@ check_and_update_appimage() {
     local CURRENT_APPIMAGE_VERSION
     CURRENT_APPIMAGE_VERSION=$(get_current_version)
 
-<<<<<<< HEAD
-    if [ -n "$APPIMAGE_PATH" ] && [ -f "$APPIMAGE_PATH" ]; then
-        # Extract version from the existing AppImage filename
-        # Expected format: Claude_Desktop-X.Y.Z[.W]-aarch64[-persistent].AppImage
-        # Supports both 3-part (0.14.10) and 4-part (1.0.1307) versions
-        CURRENT_APPIMAGE_VERSION=$(basename "$APPIMAGE_PATH" | sed -n 's/Claude_Desktop-\([0-9]\+\.[0-9]\+\.[0-9]\+\(\.[0-9]\+\)\?\)-aarch64.*\.AppImage/\1/p')
-    fi
-
-    # Check for required tools
-    if ! command -v curl &> /dev/null || ! command -v jq &> /dev/null; then
-        # Silently skip update check if tools are missing
-        return 0
-    fi
-
-    # Fetch latest release info
-    local LATEST_RELEASE_INFO=$(curl -s "$GITHUB_API_URL" 2>/dev/null)
-    if [ -z "$LATEST_RELEASE_INFO" ]; then
-        # Silently skip if GitHub is unreachable
-        return 0
-    fi
-
-    # Extract the actual Claude Desktop version from the asset filename
-    local ASSET_NAME=$(echo "$LATEST_RELEASE_INFO" | jq -r '.assets[] | select(.name | contains("arm64.AppImage") and (contains("arm64.AppImage.zsync") | not)) | .name' 2>/dev/null | head -1)
-    local DOWNLOAD_URL=$(echo "$LATEST_RELEASE_INFO" | jq -r '.assets[] | select(.name | contains("arm64.AppImage") and (contains("arm64.AppImage.zsync") | not)) | .browser_download_url' 2>/dev/null | head -1)
-    # Support both 3-part and 4-part version numbers
-    local LATEST_VERSION=$(echo "$ASSET_NAME" | sed -n 's/claude-desktop-\([0-9]\+\.[0-9]\+\.[0-9]\+\(\.[0-9]\+\)\?\)-arm64\.AppImage/\1/p')
-
-    if [ -z "$LATEST_VERSION" ] || [ -z "$DOWNLOAD_URL" ]; then
-        # Silently skip if we can't parse the response
-=======
     local LATEST_VERSION
     LATEST_VERSION=$(get_latest_version)
 
     if [ -z "$LATEST_VERSION" ]; then
         log_warn "Could not determine latest version. Skipping update check."
->>>>>>> 8e187f6 (feat: Add auto-update, auth diagnostics, and HiDPI scaling)
         return 0
     fi
 
