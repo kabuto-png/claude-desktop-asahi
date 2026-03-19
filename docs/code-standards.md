@@ -9,9 +9,14 @@
 
 ### Shell Scripts
 - Format: `kebab-case.sh`
-- Descriptive purpose: `claude-fixed-launcher-v2.sh` not `launcher.sh`
-- Version suffix if multiple variants: `claude-launcher-no-update.sh`
+- Descriptive purpose: `scripts/launcher/claude-launcher.sh` not `launcher.sh`
+- Version suffix if multiple variants: `scripts/launcher/claude-launcher-no-update.sh`
 - Avoid single-letter names: `c.sh` ❌, `claude-cli.sh` ✓
+
+### Directory Organization
+- Scripts organized by function: `scripts/{builders,launcher,tools,version,legacy}/`
+- Each category has focused responsibilities
+- Deprecated scripts moved to `scripts/legacy/`
 
 ### Configuration
 - `package.json` - npm/Node config
@@ -23,7 +28,9 @@
 ### Header Block
 ```bash
 #!/bin/bash
-
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Claude Desktop AppImage Project
+#
 # Description: Brief explanation of what this script does
 # Usage: ./script-name.sh [OPTIONS]
 # Exit codes:
@@ -422,6 +429,23 @@ fi
   [[ $DEBUG -eq 1 ]] && echo "[DEBUG] $message" >&2
   ```
 
+## SPDX License Headers
+
+All shell scripts must include Apache-2.0 SPDX header:
+```bash
+#!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2026 Claude Desktop AppImage Project
+```
+
+This identifies the license and copyright for automated tools and ensures compliance.
+
+## CI/CD Standards
+
+- All scripts must pass ShellCheck validation
+- Pull requests trigger automated test build
+- Release workflow validates checksums and artifacts
+
 ## Common Pitfalls to Avoid
 
 1. ❌ Unquoted variables: `$var` → Use `"$var"` except in specific contexts
@@ -434,6 +458,8 @@ fi
 8. ❌ Naked `cd`: Always trap EXIT to return to original dir
 9. ❌ Global variables everywhere: Use `local` in functions
 10. ❌ Assuming tool availability: Always check with `command -v`
+11. ❌ Missing SPDX headers: All scripts require Apache-2.0 header
+12. ❌ Hardcoding credentials: Never log tokens or passwords in debug output
 
 ---
 

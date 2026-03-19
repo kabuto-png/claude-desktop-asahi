@@ -12,17 +12,17 @@ Claude Desktop AppImage Builder is a 3-phase system:
 ### Build Flow (Sequential)
 
 ```
-User runs: ./build-appimage.sh
+User runs: ./scripts/builders/build-appimage.sh
            |
            v
     Auto-detect OS
     (Fedora ARM64? Generic Linux? macOS?)
            |
            +---> Fedora Asahi ARM64
-           |     └─ fedora_asahi_build_script.sh
+           |     └─ scripts/builders/fedora_asahi_build_script.sh
            |
            +---> Generic Linux
-           |     └─ manual_appimage_builder.sh
+           |     └─ scripts/builders/manual_appimage_builder.sh
            |
            +---> Unsupported
                  └─ Error + Exit
@@ -46,6 +46,7 @@ User runs: ./build-appimage.sh
    └─ Display to user
 
 4. Download Windows Installer
+   ├─ Auto-detect download URL from RELEASES data
    ├─ Download WinRAR archive from Anthropic
    ├─ Verify checksum (if available)
    └─ Extract to temporary directory
@@ -175,10 +176,10 @@ module.exports = {
 
 ## Runtime Architecture
 
-### Launcher Flow (claude-fixed-launcher-v2.sh)
+### Launcher Flow (claude-launcher.sh)
 
 ```
-User runs: ./claude-fixed-launcher-v2.sh [--no-update] [--debug]
+User runs: ./scripts/launcher/claude-launcher.sh [--no-update] [--debug]
            |
            v
 1. Setup Phase
@@ -373,7 +374,7 @@ Check 8: SSL Certificates
 Start
   |
   v
-claude-fixed-launcher-v2.sh
+scripts/launcher/claude-launcher.sh
   ├─ Kill old Claude processes
   └─ Launch AppImage
       |
@@ -407,7 +408,7 @@ Launcher Cleanup
   └─ Report exit code
 ```
 
-### Process Cleanup (claude-kill.sh)
+### Process Cleanup (scripts/tools/claude-kill.sh)
 
 ```
 Find processes
@@ -523,12 +524,25 @@ Log detailed error message
 Suggest remediation
   ├─ "Install: sudo dnf install X"
   ├─ "Check: $file"
-  ├─ "Run: claude-auth-diagnostics.sh"
+  ├─ "Run: scripts/tools/claude-auth-diagnostics.sh"
   └─ "See: docs/troubleshooting.md"
   |
   v
 Exit with appropriate code
 ```
+
+## CI/CD Infrastructure
+
+### GitHub Actions
+- **ShellCheck** - Lint all shell scripts for common issues
+- **Test Build Scripts** - Verify build process on each PR
+- **Release Workflow** - Auto-publish releases with checksums
+
+### SPDX License Headers
+All shell scripts include Apache-2.0 SPDX identifier and license text.
+
+### Contributing Guidelines
+CONTRIBUTING.md defines PR process, code style, and issue reporting standards.
 
 ## Future Extension Points
 
@@ -538,7 +552,7 @@ Exit with appropriate code
 4. **Sandbox/Confinement** - Use AppArmor or Seccomp for security
 5. **Package Managers** - RPM/DEB integration for system package managers
 6. **Container Support** - Docker/Podman Dockerfile for isolated environments
-7. **CI/CD Pipeline** - Automated builds on release detection
+7. **Expanded Platform Support** - Ubuntu, Debian, openSUSE, Alpine
 
 ---
 

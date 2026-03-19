@@ -37,27 +37,33 @@
 
 **Completion**: 100% - Core functionality stable
 
-## Phase 2: Polish & Documentation ✓ (In Progress)
+## Phase 2: Polish & Open Source Preparation ✓ (Complete)
 
-### Documentation (Current Work)
+### Documentation ✓
 - ✓ Project overview & requirements
 - ✓ Codebase summary
 - ✓ Code standards & conventions
 - ✓ System architecture
-- ⏳ Project roadmap (this file)
-- ⏳ README update (reduce to <300 lines, update refs)
-- 🔲 Troubleshooting guide
-- 🔲 Quick start guide
-- 🔲 Contributing guidelines
+- ✓ Project roadmap
+- ✓ README update (reduced, updated refs)
+
+### Code Quality & Infrastructure ✓
+- ✓ Scripts reorganized into logical directories (builders/, launcher/, tools/, version/, legacy/)
+- ✓ SPDX license headers added to all shell scripts
+- ✓ ShellCheck validation in GitHub Actions
+- ✓ Test build workflow on PR
+- ✓ Release workflow with checksums
+- ✓ CONTRIBUTING.md and GitHub templates
+- ✓ License changed to Apache-2.0
 
 ### Code Quality
-- 🔲 Refactor for clarity (if >200 LOC per script)
-- 🔲 Linting check (ShellCheck)
-- 🔲 Code review
+- ✓ Build scripts reviewed
+- ✓ Launcher with auto-update verified
+- ✓ Auth diagnostics functional
 
-**Target Completion**: 2026-03-31 (2 weeks)
+**Completion**: 100% - OSS ready (2026-03-19)
 
-## Phase 3: Enhancement & Testing (Planned)
+## Phase 3: Enhancement & Testing (In Progress)
 
 ### Expanded Platform Support
 - 🔲 x86_64 Linux (generic)
@@ -67,17 +73,19 @@
 - 🔲 Alpine Linux (lightweight)
 
 ### Improved Update System
+- ✓ Auto-detect download URL from RELEASES endpoint
 - 🔲 Update notifier UI (Zenity dialog)
 - 🔲 Multiple version management
 - 🔲 Rollback to previous version
 - 🔲 Scheduled update checks
 - 🔲 Update from custom URL support
 
-### Testing Infrastructure
-- 🔲 ShellCheck linting in CI
+### Testing & Documentation (Current)
+- ✓ ShellCheck linting in CI
 - 🔲 Integration tests for build
 - 🔲 Runtime smoke tests
-- 🔲 GitHub Actions CI/CD
+- 🔲 Troubleshooting guide
+- 🔲 Quick start guide
 
 **Target Completion**: 2026-06-30 (3 months)
 
@@ -165,17 +173,20 @@
 - [x] Auto-update detects versions
 - [x] HiDPI scaling works
 
-### Phase 2 (Polish) - In Progress
-- [x] Documentation complete (by 2026-03-31)
-- [ ] Zero ShellCheck warnings
-- [ ] All tests pass
-- [ ] Code reviewed
+### Phase 2 (OSS Preparation) - ✓ Met
+- [x] Documentation complete
+- [x] Scripts organized into logical directories
+- [x] SPDX headers added to all scripts
+- [x] GitHub Actions CI/CD configured
+- [x] CONTRIBUTING.md and templates created
+- [x] License changed to Apache-2.0
+- [x] Code reviewed and verified
 
-### Phase 3 (Expansion) - Planned
+### Phase 3 (Expansion) - In Progress
 - [ ] Build succeeds on ≥3 distros (Fedora, Ubuntu, Debian)
 - [ ] x86_64 support working
 - [ ] Update UI functional
-- [ ] CI/CD pipeline established
+- [ ] Integration tests for build process
 
 ### Phase 4 (Advanced) - Future
 - [ ] ≥2 alternative packages (RPM, DEB)
@@ -250,36 +261,41 @@
 | Version | Date | Major Changes |
 |---------|------|---------------|
 | 0.1.0 | 2026-03-19 | Initial release, Fedora Asahi ARM64 support |
-| (planned) | 2026-04-30 | Documentation complete, x86_64 support |
-| (planned) | 2026-06-30 | Package alternatives, CI/CD |
-| (planned) | 2026-12-31 | Advanced features (plugins, confinement) |
+| 0.2.0 | 2026-03-19 | OSS preparation: script reorganization, SPDX headers, CI/CD, Apache-2.0 license |
+| (planned) | 2026-04-30 | x86_64 support, additional distros |
+| (planned) | 2026-06-30 | Integration tests, improved update UI |
+| (planned) | 2026-12-31 | Advanced features (plugins, confinement, packages) |
 
 ## Getting Help
 
-- **Build Failed** → Run `./fedora_asahi_build_script.sh` with `DEBUG=1`
-- **Launch Failed** → Run `claude-auth-diagnostics.sh`
-- **Update Issues** → Check `investigate_version_sources.sh`
+- **Build Failed** → Run `scripts/builders/fedora_asahi_build_script.sh` with `DEBUG=1`
+- **Launch Failed** → Run `scripts/tools/claude-auth-diagnostics.sh`
+- **Update Issues** → Check `scripts/version/investigate-version-sources.sh`
 - **General Help** → See `docs/` directory
 - **Report Bug** → GitHub Issues with reproducible steps
+- **Contributing** → See CONTRIBUTING.md
 
 ## Next Steps
 
-1. **Immediate** (This week)
-   - Complete documentation (Phase 2)
-   - Code review + ShellCheck pass
+1. **Immediate** (This week - COMPLETE)
+   - ✓ Script reorganization
+   - ✓ SPDX headers
+   - ✓ CI/CD configuration
+   - ✓ Open source licensing
 
-2. **Short-term** (This month)
+2. **Short-term** (Next month)
    - Troubleshooting guide
    - Quick start guide
-   - Contributing guidelines
+   - Platform support expansion
 
 3. **Medium-term** (This quarter)
    - x86_64 support
-   - Additional distros
+   - Ubuntu/Debian support
    - Update UI improvements
+   - Integration tests
 
 4. **Long-term** (This year)
-   - Package alternatives
+   - Package alternatives (RPM, DEB)
    - Security hardening
    - Community plugins
 

@@ -10,15 +10,16 @@
 
 ## Build System Scripts
 
-### build-appimage.sh (206 LOC)
+### scripts/builders/build-appimage.sh (206 LOC)
 Universal entry point. Auto-detects OS and delegates to platform-specific builder.
 - Detects Fedora Asahi ARM64 vs generic Linux
+- Auto-detects download URL from Anthropic releases
 - Validates dependencies (curl, appimagetool, etc.)
 - Delegates to `fedora_asahi_build_script.sh` or `manual_appimage_builder.sh`
 - Provides fallback builder selection
 - Exit codes indicate success/failure
 
-### fedora_asahi_build_script.sh (441 LOC)
+### scripts/builders/fedora_asahi_build_script.sh (441 LOC)
 Primary builder for Fedora Asahi ARM64 (Fedora 37+). Implements complete build pipeline with 4 critical patches.
 **Key steps:**
 1. Validate Fedora version and architecture
@@ -43,7 +44,7 @@ Primary builder for Fedora Asahi ARM64 (Fedora 37+). Implements complete build p
 - `apply_patches()` - Core patch application
 - `build_appimage()` - Create final AppImage
 
-### manual_appimage_builder.sh (169 LOC)
+### scripts/builders/manual_appimage_builder.sh (169 LOC)
 Fallback builder for manual/generic Linux systems without auto-detection.
 - Manual version input
 - Manual AppImage name input
@@ -54,8 +55,8 @@ Fallback builder for manual/generic Linux systems without auto-detection.
 
 ## Launcher & Management Scripts
 
-### claude-fixed-launcher-v2.sh (502 LOC)
-Main launcher. Run Claude Desktop AppImage with auto-update, HiDPI scaling, auth fixes, process management.
+### scripts/launcher/claude-launcher.sh (502 LOC)
+Main launcher (formerly claude-fixed-launcher-v2.sh). Run Claude Desktop AppImage with auto-update, HiDPI scaling, auth fixes, process management.
 
 **Features:**
 - Kill existing processes
@@ -73,7 +74,7 @@ Main launcher. Run Claude Desktop AppImage with auto-update, HiDPI scaling, auth
 - `setup_hidpi_scaling()` - Adaptive DPI detection
 - `launch_appimage()` - Execute with proper env setup
 
-### claude-auth-diagnostics.sh (265 LOC)
+### scripts/tools/claude-auth-diagnostics.sh (265 LOC)
 Comprehensive auth troubleshooting. Checks config, permissions, tokens, network.
 
 **Diagnostic checks:**
@@ -88,14 +89,14 @@ Comprehensive auth troubleshooting. Checks config, permissions, tokens, network.
 
 **Output:** Detailed report with issues and remediation steps.
 
-### claude-kill.sh (102 LOC)
+### scripts/tools/claude-kill.sh (102 LOC)
 Clean process shutdown. Kill any running Claude Desktop instances.
 - Finds processes by AppImage name/path
 - Graceful termination with timeout
 - Force kill if graceful fails
 - Reports success/failure
 
-### claude-status.sh (92 LOC)
+### scripts/tools/claude-status.sh (92 LOC)
 Status checker. Report running state, PID, resource usage.
 - Check if Claude Desktop is running
 - Display PID and launch time
@@ -103,13 +104,13 @@ Status checker. Report running state, PID, resource usage.
 - Check if auto-update is needed
 - Display current version
 
-### claude-launcher-no-update.sh (184 LOC)
+### scripts/launcher/claude-launcher-no-update.sh (184 LOC)
 Variant of main launcher without auto-update check. Useful for offline/restricted environments.
 - Same HiDPI and process management
 - Skip update check
 - Direct AppImage execution
 
-### debug-claude-launcher.sh (34 LOC)
+### scripts/launcher/claude-launcher-debug.sh (34 LOC)
 Debug variant of launcher. Same as main launcher but with verbose output.
 - Show all environment variables
 - Display script execution trace (set -x)
@@ -117,7 +118,7 @@ Debug variant of launcher. Same as main launcher but with verbose output.
 
 ## Version Management Scripts
 
-### check-official-version.sh (148 LOC)
+### scripts/version/check-official-version.sh (148 LOC)
 Check official Claude Desktop version from Anthropic.
 - Query Anthropic RELEASES endpoint
 - Cache result locally (~/.cache/claude-version-cache)
@@ -125,30 +126,30 @@ Check official Claude Desktop version from Anthropic.
 - Fallback to GitHub (aaddrick/claude-desktop-debian) releases
 - Parse and return version string
 
-### check_latest_version.sh (51 LOC)
+### scripts/version/check-latest-version.sh (51 LOC)
 Quick version check. Lighter weight than full check.
 - Display current AppImage version
 - Show latest official version
 - Indicate if update available
 
-### check_appimage_version.sh (42 LOC)
+### scripts/version/check-appimage-version.sh (42 LOC)
 Inspect version embedded in AppImage file.
 - Extract version from AppImage metadata
 - Display build info
 - No network calls
 
-### get_actual_version.sh (66 LOC)
+### scripts/version/get-actual-version.sh (66 LOC)
 Extract version directly from app.asar inside AppImage.
 - Mount AppImage
 - Read version from asar metadata
 - Return exact running version
 
-### find_latest_claude.sh (26 LOC)
+### scripts/version/find-latest-claude.sh (26 LOC)
 Find latest built AppImage file in current directory.
 - Search for *.AppImage files
 - Return newest by date
 
-### investigate_version_sources.sh (69 LOC)
+### scripts/version/investigate-version-sources.sh (69 LOC)
 Debug script. Examine all version sources and compare.
 - Check Anthropic official version
 - Check GitHub fallback version
@@ -158,13 +159,31 @@ Debug script. Examine all version sources and compare.
 
 ## Persistence & Data Script
 
-### add_persistence_simple.sh (123 LOC)
+### scripts/tools/add-persistence-simple.sh (123 LOC)
 Add data persistence to AppImage. Ensures config/cache survives across runs.
 - Create overlay filesystem or bind mounts
 - Preserve ~/.config/Claude
 - Preserve ~/.local/share/Claude
 - Preserve ~/.cache/Claude
 - Create persistence directory structure
+
+## Cleanup & Utility Scripts
+
+### scripts/tools/cleanup-claude.sh (35 LOC)
+Cleanup utility. Remove Claude Desktop files, caches, and temporary data.
+- Remove AppImage file
+- Clear config directory
+- Clear cache directory
+- Remove downloaded installers
+- Prompt for confirmation
+
+## Legacy Scripts
+
+### scripts/legacy/ (Various)
+Deprecated or experimental scripts maintained for reference.
+- Old builder variants
+- Experimental features
+- Historical implementations
 
 ## Configuration Files
 
@@ -179,24 +198,24 @@ Git ignore rules. Excludes:
 - Downloaded installers
 - Temporary build files
 
-## Cleanup & Utility Scripts
+### CONTRIBUTING.md
+Community contribution guidelines.
+- Code style requirements
+- Pull request process
+- Issue reporting standards
+- Development setup instructions
 
-### cleanup-claude.sh (35 LOC)
-Cleanup utility. Remove Claude Desktop files, caches, and temporary data.
-- Remove AppImage file
-- Clear config directory
-- Clear cache directory
-- Remove downloaded installers
-- Prompt for confirmation
+### GitHub Issue/PR Templates
+Standardized templates in `.github/` for consistent issue/PR submissions.
 
 ## Architecture & Data Flow
 
 ### Build Time Flow
 ```
-build-appimage.sh
+scripts/builders/build-appimage.sh
   ├─ Detect system
   ├─ Delegate to fedora_asahi_build_script.sh OR manual_appimage_builder.sh
-  │  ├─ Download Windows installer
+  │  ├─ Download Windows installer (auto-detected URL)
   │  ├─ Extract app.asar
   │  ├─ Apply 4 patches
   │  ├─ Install claude-native stub
@@ -206,7 +225,7 @@ build-appimage.sh
 
 ### Runtime Flow
 ```
-claude-fixed-launcher-v2.sh
+scripts/launcher/claude-launcher.sh
   ├─ Kill existing instances (claude-kill.sh logic)
   ├─ Setup XDG directories
   ├─ Check for updates
@@ -221,11 +240,21 @@ claude-fixed-launcher-v2.sh
 ### Support/Troubleshooting Flow
 ```
 User encounters issue
-  ├─ Run claude-status.sh → Check if running
-  ├─ Run claude-auth-diagnostics.sh → Diagnose auth
-  ├─ Run investigate_version_sources.sh → Check versions
-  └─ Run debug-claude-launcher.sh → See detailed logs
+  ├─ Run scripts/tools/claude-status.sh → Check if running
+  ├─ Run scripts/tools/claude-auth-diagnostics.sh → Diagnose auth
+  ├─ Run scripts/version/investigate-version-sources.sh → Check versions
+  └─ Run scripts/launcher/claude-launcher-debug.sh → See detailed logs
 ```
+
+## Code Quality & Infrastructure
+
+### SPDX Headers
+All shell scripts include Apache-2.0 SPDX license header at top of file.
+
+### Linting & CI
+- ShellCheck validation in GitHub Actions
+- Automated test build on PR submissions
+- Release workflow with checksums and artifacts
 
 ## Code Patterns & Conventions
 
@@ -263,13 +292,13 @@ User encounters issue
 
 | Category | Files | LOC | Avg LOC/file |
 |----------|-------|-----|--------------|
-| Build | 3 | 816 | 272 |
-| Launcher | 7 | 1,111 | 159 |
-| Version Mgmt | 6 | 402 | 67 |
-| Persistence | 1 | 123 | 123 |
+| Build (scripts/builders/) | 3 | 816 | 272 |
+| Launcher (scripts/launcher/) | 3 | 720 | 240 |
+| Tools (scripts/tools/) | 4 | 594 | 149 |
+| Version (scripts/version/) | 6 | 402 | 67 |
 | Config | 2 | 57 | 29 |
-| Cleanup | 1 | 35 | 35 |
-| **TOTAL** | **20** | **2,544** | **127** |
+| Legacy & Experimental | 3+ | ~500 | ~150 |
+| **TOTAL** | **21+** | **~3,089** | **~147** |
 
 **Plus existing docs**: README (354), Complete Guide (397), Technical Docs (282), + 5 more = ~1,800 LOC
 
