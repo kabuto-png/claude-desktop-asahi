@@ -167,13 +167,12 @@ jobs:
           echo "Found app.asar: $ASAR"
           cp "$ASAR" app.asar
 
-          # Copy app.asar.unpacked from installer if it exists (contains native modules)
+          # Copy app.asar.unpacked structure from installer if it exists
           ASAR_DIR=$(dirname "$ASAR")
           if [ -d "${ASAR_DIR}/app.asar.unpacked" ]; then
             echo "Found app.asar.unpacked, copying structure..."
-            # Copy directory structure but create empty .node files (Windows binaries don't work on Linux)
-            find "${ASAR_DIR}/app.asar.unpacked" -type d -exec mkdir -p "app.asar.unpacked/{}" \; 2>/dev/null || true
-            find "${ASAR_DIR}/app.asar.unpacked" -name "*.node" | while read f; do
+            # Copy directory structure and create empty files for all binaries (Windows binaries don't work on Linux)
+            find "${ASAR_DIR}/app.asar.unpacked" -type f | while read f; do
               REL_PATH="${f#${ASAR_DIR}/app.asar.unpacked/}"
               mkdir -p "app.asar.unpacked/$(dirname "$REL_PATH")"
               touch "app.asar.unpacked/$REL_PATH"
@@ -181,10 +180,9 @@ jobs:
             done
           fi
 
-          # Read asar header to find all unpacked file references and create dummies
-          echo "Creating dummy files for unpacked native modules..."
+          # Read asar header to find ALL unpacked file references and create dummies
+          echo "Creating dummy files for all unpacked references..."
           node -e "
-          const asar = require('@electron/asar');
           const fs = require('fs');
           const path = require('path');
 
@@ -194,7 +192,8 @@ jobs:
               const fullPath = currentPath ? currentPath + '/' + name : name;
               if (entry.files) {
                 walkHeader(entry, fullPath);
-              } else if (entry.unpacked && name.endsWith('.node')) {
+              } else if (entry.unpacked) {
+                // Create dummy for ALL unpacked files (.node, .dll, etc)
                 const dummyPath = 'app.asar.unpacked/' + fullPath;
                 const dir = path.dirname(dummyPath);
                 if (!fs.existsSync(dummyPath)) {
