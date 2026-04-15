@@ -167,11 +167,61 @@ jobs:
           echo "Found app.asar: $ASAR"
           cp "$ASAR" app.asar
 
-          # Create dummy unpacked native module (Windows .node not needed on Linux)
-          mkdir -p app.asar.unpacked/node_modules/@anthropic-ai/claude-native/
-          mkdir -p app.asar.unpacked/node_modules/@ant/claude-native/
-          touch app.asar.unpacked/node_modules/@anthropic-ai/claude-native/claude-native-binding.node
-          touch app.asar.unpacked/node_modules/@ant/claude-native/claude-native-binding.node
+          # Copy app.asar.unpacked from installer if it exists (contains native modules)
+          ASAR_DIR=$(dirname "$ASAR")
+          if [ -d "${ASAR_DIR}/app.asar.unpacked" ]; then
+            echo "Found app.asar.unpacked, copying structure..."
+            # Copy directory structure but create empty .node files (Windows binaries don't work on Linux)
+            find "${ASAR_DIR}/app.asar.unpacked" -type d -exec mkdir -p "app.asar.unpacked/{}" \; 2>/dev/null || true
+            find "${ASAR_DIR}/app.asar.unpacked" -name "*.node" | while read f; do
+              REL_PATH="${f#${ASAR_DIR}/app.asar.unpacked/}"
+              mkdir -p "app.asar.unpacked/$(dirname "$REL_PATH")"
+              touch "app.asar.unpacked/$REL_PATH"
+              echo "  Created dummy: app.asar.unpacked/$REL_PATH"
+            done
+          fi
+
+          # Read asar header to find all unpacked file references and create dummies
+          echo "Creating dummy files for unpacked native modules..."
+          node -e "
+          const asar = require('@electron/asar');
+          const fs = require('fs');
+          const path = require('path');
+
+          function walkHeader(header, currentPath = '') {
+            if (!header || !header.files) return;
+            for (const [name, entry] of Object.entries(header.files)) {
+              const fullPath = currentPath ? currentPath + '/' + name : name;
+              if (entry.files) {
+                walkHeader(entry, fullPath);
+              } else if (entry.unpacked && name.endsWith('.node')) {
+                const dummyPath = 'app.asar.unpacked/' + fullPath;
+                const dir = path.dirname(dummyPath);
+                if (!fs.existsSync(dummyPath)) {
+                  fs.mkdirSync(dir, { recursive: true });
+                  fs.writeFileSync(dummyPath, '');
+                  console.log('  Created:', dummyPath);
+                }
+              }
+            }
+          }
+
+          try {
+            const disk = require('@electron/asar/lib/disk');
+            const fd = fs.openSync('app.asar', 'r');
+            const header = disk.readFilesystem(fd);
+            fs.closeSync(fd);
+            walkHeader(header.header);
+          } catch (e) {
+            console.log('Note: Could not parse asar header:', e.message);
+          }
+          " || true
+
+          # Ensure claude-native stubs exist (always needed)
+          for DIR in "@anthropic-ai/claude-native" "@ant/claude-native"; do
+            mkdir -p "app.asar.unpacked/node_modules/${DIR}"
+            touch "app.asar.unpacked/node_modules/${DIR}/claude-native-binding.node"
+          done
 
           # Extract asar for patching
           asar extract app.asar app_source/
