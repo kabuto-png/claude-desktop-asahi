@@ -4,6 +4,6 @@
   "private": true,
   "devDependencies": {
     "@electron/asar": "^4.1.0",
-    "electron": "^42.3.0"
+    "electron": "^43.4.0"
   }
 }
